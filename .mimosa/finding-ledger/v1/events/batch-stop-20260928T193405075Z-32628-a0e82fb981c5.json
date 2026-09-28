@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260928T193405075Z-32628-a0e82fb981c5",
+  "runId": "20260928T193405075Z-32628-a0e82fb981c5",
+  "runStatus": "inconclusive",
+  "coverage": {
+    "status": "partial",
+    "reasons": [
+      {
+        "code": "baseline_partial",
+        "stage": "baseline",
+        "target": ".",
+        "detail": "baseline capture had enumeration or snapshot errors",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline",
+        "target": ".",
+        "detail": "baseline_partial: baseline capture had enumeration or snapshot errors",
+        "affectsCompletion": true
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "726b2e1ef17ecffb95aa21188c67f878d468fcfd",
+  "diffHash": "be492bc07e1863035e0b1dffa9465b868b8bc5541ded6e8287d34a690e45eaf2",
+  "rulesVersion": "unavailable",
+  "sessionHash": "059a5486c204d33c8d5c2467a24cbfe5d1c427365456864fc62cea90e2eb2ce5",
+  "reportRef": ".mimosa/reports/task-review-sess_dwf-dwfrun-9aa8b294-cb55-4917-9dc6-568b4fb3cdea-actor_6_1-20260928T193405075Z-32628-a0e82fb981c5.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "短剧多国出海/repo/scripts/gate_b1.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-28T19:34:07.076Z"
+}
