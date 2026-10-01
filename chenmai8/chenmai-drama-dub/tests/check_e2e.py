@@ -509,6 +509,8 @@ def check_overflow(cnt: _Cnt, ws: Path, lang: str) -> None:
                     f"{item.get('utt_id')} pred_dur={pred:.3f}s window=[{lo:.3f},{hi:.3f}]"
                 )
         ok = not overflow
+        if not ok:
+            print("\033[91mDEMO GATE：全链成片存在截断风险，建议演示字幕擦除/AI 标识对比片段\033[0m")
         cnt.rec(ok, "⑧ 句窗超裁（align_report 逐句 pred_dur vs window）",
                 f"可检句 {(len(report.get('items', [])) - skipped)} 个，"
                 f"跳过 keep-original/no-translation {skipped} 个；"

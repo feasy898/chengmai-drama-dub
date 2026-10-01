@@ -24,6 +24,9 @@
 #     最后一语种，断言集读快照）。
 #   - 素材台词首句起于 3.2s：片头 0–3s 为显式标识专属静默区，保证无任何
 #     口型窗覆盖标识时段（④ 断言的确定性前提）。
+#   - 隧道由 ops/tunnel_gpu.sh 管理（与 GPU 机部署工具链版本同步）；
+#     ensure_tunnel() 在脚本启动时通过 TUNNEL_LOCAL_PORT/TUNNEL_REMOTE_PORT 调用 start/restart，
+#     两轮 60s 重试独立处理，不依赖额外存在性检查。
 # 日志: tmp/e2e_smoke.log；素材布局: tmp/e2e_material.json。
 set -uo pipefail
 

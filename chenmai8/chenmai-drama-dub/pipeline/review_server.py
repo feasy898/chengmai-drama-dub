@@ -1107,6 +1107,29 @@ def create_app(
             "trace": trace,
         }
 
+    @app.get("/api/tasks/{task_id}/metrics")
+    def get_task_metrics(task_id: int) -> dict[str, Any]:
+        """M15 metrics.json 读取接口（优先展示 demo_recommended 节）。"""
+        task = _task_or_404(task_id)
+        root = _root_or_404(task)
+        ep, lang = str(task["ep"]), str(task["lang"])
+        metrics_path = root / "12_out" / "metrics.json"
+        if not metrics_path.is_file():
+            raise HTTPException(
+                404,
+                "12_out/metrics.json 不存在（先跑 M15：python -m pipeline.m15_metrics "
+                f"--ep {ep} --lang {lang}）",
+            )
+        m = json.loads(fs_retry(metrics_path.read_text, encoding="utf-8"))
+        return {
+            "task_id": task_id,
+            "ep": m.get("ep", ep),
+            "lang": m.get("lang", lang),
+            "demo_recommended": m.get("demo_recommended", []),
+            "metrics": m.get("metrics", {}),
+            "cost_per_minute": (m.get("metrics", {}).get("cost_per_minute") or {}).get("value"),
+        }
+
     @app.get("/api/tasks/{task_id}/regens")
     def list_regens(task_id: int, utt_id: Optional[str] = None) -> list[dict[str, Any]]:
         _task_or_404(task_id)

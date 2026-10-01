@@ -131,6 +131,12 @@ python tests/check_e2e.py --ep e2e01 --langs en   # e2e 断言集（时长/字�
 - 整门记录：B1 6/6 PASS（92 passed 零跳过）；B2 6/6 PASS 867s（126 passed）；B3 6/6 PASS 3469s（177 passed）——均 2026-09-29。
 - 服务可达但模型未就绪属**真实故障**，不提供跳过口径。
 
+## 4.1 演示日 Gate（全链成片前置）
+
+> **DEMO GATE**：`tests/check_e2e.py` ⑧⑨ PASS 是全链成片演示的前置条件。
+> 若句窗超裁（⑧）或末句截断对齐（⑨）任一 FAIL，全链成片存在截断风险，
+> 建议演示字幕擦除/AI 标识对比片段。
+
 ## 5. 替换/重生成模块时的回归清单
 
 | 被替换模块 | 必跑回归 | 额外人工检查 |
@@ -172,7 +178,25 @@ python tests/check_e2e.py --ep e2e01 --langs en   # e2e 断言集（时长/字�
    token 表在 gate_b0.py 拼接构造（防自命中）。`c2pa` 裸词允许（标准名/契约字段），
    `lora` 裸词允许（中性名 isomt-lora 自含）。
 
-### 6.1 网络与镜像（限流/403 实测经验）
+### 6.1 隧道（:9001/:9004 周期 reset 全链瘫换）
+
+隧道脆弱是常态：公网 SSH 链路周期性 reset（时长不固定，短则数秒、长则数分钟），
+:9001/:9004 断则 ASR/翻译全链瘫换。定案三件套：
+
+1. **keepalive 常驻**：每端口一个 `bash ops/tunnel_gpu.sh keepalive` nohup 进程
+   （日志 `tmp/tunnel_keepalive.log`），自动检测断连并按 `ops/tunnel_gpu.sh restart` 拉起；
+   单实例锁防并发叠加（B1 批冻结）。
+2. **60s 重试窗**：e2e / eval 脚本遇端口不可达时，先等 60s 再拉一轮重试
+   （不并发叠加请求——同 keepalive 拉起失败不并发叠加的纪律）；
+   两轮重试均无效才 FAIL / SKIP，归因到具体端口（:9001 与 :9004 互不可代偿）。
+3. **录屏兜底 SOP**：排查隧道 flapping 时，在 GPU 机侧 `asciinema rec /tmp/tunnel-debug.cast`
+   或本机录屏，记录 `curl -v /health`、`ps -ef | grep ssh`、`tunnel_keepalive.log` 尾部；
+   复现后以时间线对齐 ssh 断开与服务探测失败，确认为链路层问题后再走 `ops/tunnel_gpu.sh restart`。
+
+> 隧道不走 tailnet 数据面（本机→GPU 方向实测不通），走 ssh config 公网 Host 条目；
+> 服务零公网暴露。坑与定案详见 [specs/gpu-tunnel.md](specs/gpu-tunnel.md)。
+
+### 6.2 网络与镜像（限流/403 实测经验）
 
 | 场景 | 实测结论 | 定案 |
 |---|---|---|

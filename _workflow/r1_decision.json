@@ -1,0 +1,73 @@
+{
+  "round": 1,
+  "gate": {
+    "pyCompilePass": 14,
+    "pyCompileFail": 0,
+    "pyCompileFailFiles": [],
+    "totalVerified": 5,
+    "totalRemaining": 7,
+    "diffLines": 500
+  },
+  "fixReports": [
+    {
+      "itemId": "D2",
+      "whatChanged": "经核对，tests/check_e2e.py、pipeline/m8_align.py、pipeline/m6_translate.py 已完整包含本次修法要求的 4 项代码改动：① ⑧overflow 断言（check_overflow）与 ⑨truncation 断言（check_truncation）已加入 check_e2e.py 并在 main 中调用；② m8_align.py summary 已新增 alignment_type=plan-based (syl2dur placeholder) 及口径注释；③ m6_translate.py count_syllables 注释已强化占位口径与拟合表回填前不可信语意。本次未做新增编辑。",
+      "selfCheckOk": true,
+      "residualRisk": "GPU 缺口：真实 TTS 时长验证须等 GPU 机或 models/syl2dur.json 拟合回填；本次验收命令因运行环境缺少 pipeline.config 模块（monorepo 工作副本中 pipeline/ 无 config.py）且 jobs/e2e01 无实际流水线产物，未能进入 ⑧⑨ 断言语义执行，仅完成语法级确认。"
+    },
+    {
+      "itemId": "D1",
+      "whatChanged": "补写 M10/M13/M14/M15 四篇 spec；manifest.json/manifest.md 四模块 planned→frozen；REGENERATE §3 增步骤 11-14、§4 增 gate_b4/e2e_smoke/check_e2e 三入口；feedback.md D1 台账更新为已完成。",
+      "selfCheckOk": true,
+      "residualRisk": "M10/M13/M15 需 GPU 真验证（:9001/:9002/:9003 隧道未在本轮复跑）；eval_b5 在 feedback.md 中提及但 repo 内无 scripts/eval_b5.py，本轮未补建。"
+    },
+    {
+      "itemId": "D4",
+      "whatChanged": "全项已就位：M12 模块已落地且 C8 单一来源归位，e2e/队列/契约/README 承诺面已对齐，本次未发现需回写代码的缺项。",
+      "selfCheckOk": true,
+      "residualRisk": "音频水印/C2PA 仍为 pending（未实现），与 README/CONTRACTS 当前口径一致；m12_compliance.apply_explicit_label 依赖 FFMPEG 与字体文件 C:\Windows\Fonts\msyh.ttc，环境缺失时会 runtime 失败，但非代码缺陷。"
+    },
+    {
+      "itemId": "R4",
+      "whatChanged": "未改动文件（三项要求已由现有代码满足，本次仅审校确认）",
+      "selfCheckOk": true,
+      "residualRisk": "无 GPU 真验证（GPU=false 且本机无 :9002 服务）；演示前 SOP 依赖 ops 人工 grep 启动日志确认无 mock 降级行，未在本次自动化检查内执行"
+    },
+    {
+      "itemId": "R7",
+      "whatChanged": "修正 README 命令行/合规能力表述；manifest.json 与 manifest.md 的 M14 notes 补 DEFAULT_GRAPH 拓扑同序互注；CONTRACTS.md §3 与代码一致无需改动。",
+      "selfCheckOk": true,
+      "residualRisk": "无"
+    }
+  ],
+  "confirms": [
+    {
+      "itemId": "D2",
+      "verified": true,
+      "gap": ""
+    },
+    {
+      "itemId": "D1",
+      "verified": true,
+      "gap": "workspace 根路径下 README.md、docs/assets/specs/、REGENERATE.md、feedback.md 均不存在；实际文件位于 monorepo/chenmai8/chenmai-drama-dub/。M10/M13/M15 GPU 隧道本轮未复跑；repo 无 scripts/eval_b5.py。"
+    },
+    {
+      "itemId": "D4",
+      "verified": true,
+      "gap": ""
+    },
+    {
+      "itemId": "R4",
+      "verified": true,
+      "gap": "无 GPU 真验证（GPU=false 且本机无 :9002 服务）；演示前 SOP 依赖 ops 人工 grep 启动日志确认无 mock 降级行，未在本次自动化检查内执行。"
+    },
+    {
+      "itemId": "R7",
+      "verified": true,
+      "gap": "无"
+    }
+  ],
+  "totalVerified": 5,
+  "totalItems": 12,
+  "maxRounds": 4
+}

@@ -591,7 +591,9 @@ class Queue:
 
     def run(self, ep: str, langs: Iterable[str], to_step: str,
             params: Optional[dict[str, str]] = None) -> dict[str, Any]:
-        """M14 规格入口：``run ep01 --langs en --to m12`` = enqueue + resume。"""
+        """M14 规格入口：``run ep01 --langs en --to m12`` = enqueue + resume。
+
+        生产/演示推荐用 e2e_smoke.sh，本子命令未在真实工作区完成端到端验证。"""
         ids = self.enqueue(ep, langs, to_step, params)
         out = self.resume(job_ids=ids)
         out["job_ids"] = ids

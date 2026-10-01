@@ -126,6 +126,18 @@ def compute_metrics(
     }
 
     missing = [k for k, v in metrics.items() if v["status"] != "ok"]
+    # demo_recommended: 优先展示非 placeholder 指标 + lip_score + cost_per_minute
+    _real_method_keys = [k for k, v in metrics.items() if "placeholder" not in v["method"]]
+    _always_include = {"lip_score", "cost_per_minute"}
+    demo_recommended = [
+        {
+            "key": k,
+            "value": metrics[k]["value"],
+            "method": metrics[k]["method"],
+            "status": metrics[k]["status"],
+        }
+        for k in dict.fromkeys(_real_method_keys + sorted(_always_include - set(_real_method_keys)))
+    ]
     summary = {
         "ep": ep,
         "lang": lang,
@@ -133,6 +145,7 @@ def compute_metrics(
         "n_metrics_total": len(metrics),
         "all_measured": not missing,
         "missing": missing,
+        "demo_recommended": demo_recommended,
         "mix_duration_s": round(mix_dur, 3),
         "wall_total_s": round(wall_total, 3),
         "metrics": metrics,

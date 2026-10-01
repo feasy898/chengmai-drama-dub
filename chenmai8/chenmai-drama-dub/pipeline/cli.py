@@ -64,7 +64,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="自定义步骤图 JSON（默认 pipeline.queue.DEFAULT_GRAPH）")
 
     p_run = sub.add_parser("run", parents=[common],
-                           help="按依赖图运行一集（enqueue + resume）")
+                           help="按依赖图运行一集（enqueue + resume）",
+                           epilog="[DEMO RISK] `python -m pipeline.cli run` 未在真实工作区完成端到端验证；"
+                                  "生产/演示推荐走 scripts/e2e_smoke.sh 已验证路径。")
     p_run.add_argument("ep", help="集 ID，如 ep01")
     p_run.add_argument("--langs", default="en", help="目标语种，逗号分隔")
     p_run.add_argument("--to", default="m15",
@@ -164,6 +166,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    print("[DEMO RISK] `python -m pipeline.cli run` 未在真实工作区完成端到端验证；"
+          "生产/演示推荐走 scripts/e2e_smoke.sh 已验证路径。", file=sys.stderr)
     q = _queue(args, to_step=args.to)
     out = q.run(args.ep, args.langs.split(","), args.to, _params(args))
     for job in out["jobs"]:
