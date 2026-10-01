@@ -583,7 +583,7 @@ def _stage_m7(
             f"C5 无 {u.utt_id} 行（先跑 M8 重对齐，或 m8 阶段）")
     out = root / item.out
     if item.keep_original:
-        detail = {"mode": "keep-original",
+        detail = {"mode": "keep-original", "degraded": False,
                   "reason": "C5 keep_original=true（nonverbal/无译文）——复用原人声，不合成",
                   "elapsed_s": round(time.time() - t0, 3)}
         store.add_regen(task_id, u.utt_id, _STAGE_NAME["m7"], from_state,
@@ -594,6 +594,7 @@ def _stage_m7(
     reason = ""
     info: dict[str, Any] = {}
     if tts_mode == "force-mock":
+        # 离线开发/测试（无 GPU）、需要确定性 mock 波形回归、或不想承担 tts_reachable() 探测延迟（约3s）
         reason = "请求显式 force-mock（离线口径）"
     else:
         ok, probe = tts_reachable()
@@ -612,7 +613,7 @@ def _stage_m7(
     info_wav = fs_retry(sf.info, str(out))
     meas = round(info_wav.frames / info_wav.samplerate, 3)
     detail = {
-        "mode": mode, "tts_requested": tts_mode, "reason": reason,
+        "mode": mode, "degraded": mode == "mock", "tts_requested": tts_mode, "reason": reason,
         "mock": mode == "mock",
         "text": item.text, "expect_dur": item.expect_dur, "meas_dur": meas,
         "wav": str(out), "elapsed_s": round(time.time() - t0, 3),
@@ -700,12 +701,13 @@ def _ffprobe_tags(path: Path) -> dict[str, str]:
 def build_compliance(
     root: Path, ep: str, lang: str, cfg: dict[str, Any],
     reviewed: list[str],
+    explicit_state: str = "pending",
 ) -> dict[str, Any]:
     """C8 合规报告（审校台出口）。
 
     如实口径：findings 归 M12 规则引擎（未接入前留空并在 generator 注明）；
     隐式标识状态对 12_out 成片 ffprobe 实测（C7 缺省回落 m9 配置兜底）；
-    显式/C2PA/水印三项 pending（M12 未部署），不伪造 ok。
+    显式/C2PA/水印三项 pending（M12 未部署时由审校台缺省 pending）。
     """
     channels = cfg.get("channels") or {}
     market = str((channels.get(lang) or {}).get("market", f"unknown-{lang}"))
@@ -731,7 +733,7 @@ def build_compliance(
         "ep": ep,
         "findings": [],
         "label_status": {
-            "explicit": "pending", "implicit": implicit_state,
+            "explicit": explicit_state, "implicit": implicit_state,
             "c2pa": "pending", "audio_wm": "pending",
         },
         "human_review": reviewed,
@@ -1434,6 +1436,9 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_pipeline_config()
     jobs_root = Path(args.jobs) if args.jobs else Path(cfg["paths"]["jobs_dir"])
     import uvicorn
+
+    # SOP：演示前请 grep 启动日志确认无 mock 占位降级行（grep 'mock 占位'）
+    # 若出现 mock 占位降级，需记录于 ops 台账，说明是否为 force-mock 声明
 
     uvicorn.run(create_app(jobs_root, db_path=args.db),
                 host=args.host, port=args.port, log_level="info")

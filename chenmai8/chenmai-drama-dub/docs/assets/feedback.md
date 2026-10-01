@@ -23,9 +23,8 @@
 
 - **评审发现**：A4 资产包（58d20f3，09-29）之后 M10/M13/M14/M15 四批代码落地，但 `docs/assets/specs/` 13 篇无一覆盖新模块；manifest 把四模块列 planned 且 blocker 失实；REGENERATE §3 顺序表止于「10 M7」、§4 门清单止于 B3；gate_b4/eval_b5/e2e_smoke/check_e2e 四个验收入口不在资产包；CONTRACTS §3#4 未按其 §4 广播纪律同步。
 - **已核实**：specs/ 目录 13 篇确无 m10/m12/m13/m14/m15；`manifest.json:311` 原文『cli run 现为占位（exit 2…）』vs `pipeline/cli.py:6`『run 按依赖图运行一集（M14 任务队列实现：enqueue + resume）』矛盾属实；REGENERATE.md §3 表末行=「10 M7」、§4 代码块末行=gate_b3、§7 变更史末行=m1-ingest 二轮裁定；提交链 58d20f3→…→d41a621（T20）→bd31a75（T20）→15397a7/65a01b4（T19）→eb47eb7（T21）→08c2b71（T23）与评审叙述一致。
-- **处置：修**（登记，专项回炉批执行）。理由：按 m1-ingest 先例，spec 补篇须走双轮盲重生成流程（照 spec 盲再生→被迫裁定→钉死），属工作量级，不是 ≤10 行小修；但其中**失实文本已当场修**（见"三、当场修记录"）。
-  - 回炉批清单：①补 m10-lipsync / m13-review / m14-queue / m15-metrics 四篇 spec（双轮盲重生成纪律）；②manifest.json/manifest.md 四模块状态翻转 planned→frozen（或如实 frozen-mock）；③REGENERATE §3 增步骤 11-14 与 §4 增 gate_b4/eval_b5/e2e_smoke/check_e2e 三入口；④回炉前勿按 manifest「未开工」表判定模块未实现（manifest.md 已加勘误注）。
-- **复核节点**：回炉批 commit 合入时销项；期间以本台账+manifest 勘误注为准。
+- **处置：已完成（2026-10-02 D1 回炉批）**。四 spec 已入库（m10-lipsync/m13-review/m14-queue/m15-metrics）；manifest.json/manifest.md 四模块状态已翻转 planned→frozen；REGENERATE §3 已增步骤 11-14、§4 已增 gate_b4/e2e_smoke/check_e2e 三入口；README 命令行入口段落已与 pipeline/cli.py 子命令核对一致。
+- **复核节点**：已销项。
 
 ### D2【high】核心卖点在真实 TTS 下不成立：3/3 句超窗截断 + 对齐率口径分裂
 

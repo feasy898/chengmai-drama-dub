@@ -433,55 +433,7 @@ PYTTS
   run_step "m11_subs[$LANG]" "$PY" -m pipeline.m11_subs --ep "$EP" --lang "$LANG"
   run_step "m9_mix[$LANG]"   "$PY" -m pipeline.m9_mix --ep "$EP" --lang "$LANG"
 
-  say "---- [explicit_label[$LANG]] 片头 3s 显式标识（M12 最小替身，PIL 渲染 PNG + overlay）+ 元数据重封"
-  "$PY" - "$EP" "$LANG" >> "$LOG" 2>&1 <<'PYLBL'
-import json
-import subprocess
-import sys
-import tempfile
-from pathlib import Path
-
-from PIL import Image, ImageDraw, ImageFont
-
-ep, lang = sys.argv[1], sys.argv[2]
-root = Path.cwd()
-sys.path.insert(0, str(root))
-from pipeline.config import load_pipeline_config  # noqa: E402
-from pipeline.m1_ingest import FFMPEG  # noqa: E402
-
-out12 = (Path(load_pipeline_config()["paths"]["jobs_dir"]) / ep / "12_out"
-         / f"{ep}.{lang}.mp4")
-assert out12.is_file(), f"成片不存在: {out12}（M9 未跑？）"
-labels = json.loads((out12.parents[1] / "11_labels" / "labels.json")
-                    .read_text(encoding="utf-8"))
-field, value = labels["implicit"]["metadata_field"], labels["implicit"]["value"]
-
-# 用 PIL 预渲染标识 PNG（等价 drawtext 顶部居中/片头 3s；本机 ffmpeg 6.1.1 的
-# drawtext=textfile 走滤镜图解析异常，overlay+enable 为等效替身，实测通过）。
-tmp = Path(tempfile.mkdtemp(prefix="e2e_lbl_"))
-font = ImageFont.truetype(r"C:\Windows\Fonts\msyh.ttc", 84)
-probe = ImageDraw.Draw(Image.new("RGB", (8, 8)))
-bb = probe.textbbox((0, 0), "本内容由AI生成", font=font, stroke_width=6)
-img = Image.new("RGBA", (bb[2] - bb[0], bb[3] - bb[1]), (0, 0, 0, 0))
-ImageDraw.Draw(img).text((-bb[0], -bb[1]), "本内容由AI生成", font=font,
-                         fill=(255, 255, 255, 255), stroke_width=6,
-                         stroke_fill=(0, 0, 0, 255))
-png = tmp / "ai_label.png"
-img.save(png)
-
-fc = "[0:v][1:v]overlay=(W-w)/2:64:enable='lte(t,3)'[v]"  # label_zone: top_px=60
-tmp_out = out12.with_name(out12.name + ".lbl.tmp.mp4")
-subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-i", str(out12), "-i", str(png),
-                "-filter_complex", fc, "-map", "[v]", "-map", "0:a:0",
-                "-c:v", "libx264", "-crf", "18", "-preset", "medium",
-                "-pix_fmt", "yuv420p", "-c:a", "copy",
-                "-movflags", "+faststart+use_metadata_tags",
-                "-metadata", f"{field}={value}", str(tmp_out)],
-               check=True, timeout=1200)
-tmp_out.replace(out12)
-print(f"OK explicit_label {out12.name} field={field}")
-PYLBL
-  check_rc "explicit_label[$LANG]" $?
+  run_step "m12_compliance[$LANG]" "$PY" -m pipeline.m12_compliance --ep "$EP" --lang "$LANG"
 
   if [ "$LIP_UP" = 1 ]; then
     cp "$JOBS_ABS/$EP/12_out/$EP.$LANG.mp4" "$JOBS_ABS/$EP/12_out/.prelip.$EP.$LANG.mp4"

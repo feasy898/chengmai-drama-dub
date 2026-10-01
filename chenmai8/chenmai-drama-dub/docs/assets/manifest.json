@@ -1,0 +1,125 @@
+{
+  "modules": [
+    {
+      "id": "M1",
+      "title": "摄取与预处理",
+      "spec": "docs/assets/specs/m1-ingest.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "T1 冻结批"
+    },
+    {
+      "id": "M2",
+      "title": "OCR 字幕抽取",
+      "spec": "docs/assets/specs/m2-ocr.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": ""
+    },
+    {
+      "id": "M3",
+      "title": "人声/背景分离",
+      "spec": "docs/assets/specs/m3-separate.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": ""
+    },
+    {
+      "id": "M4",
+      "title": "ASR 识别对齐",
+      "spec": "",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "实现已入库（pipeline/m4_asr.py）"
+    },
+    {
+      "id": "M5",
+      "title": "说话人区分与角色绑定",
+      "spec": "docs/assets/specs/m5-diar.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": ""
+    },
+    {
+      "id": "M6",
+      "title": "整集上下文翻译",
+      "spec": "docs/assets/specs/m6-translate.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": ""
+    },
+    {
+      "id": "M7",
+      "title": "情绪迁移合成",
+      "spec": "docs/assets/specs/m7-tts.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "T12 冻结批"
+    },
+    {
+      "id": "M8",
+      "title": "时长对齐",
+      "spec": "docs/assets/specs/m8-align.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "T14 定案"
+    },
+    {
+      "id": "M9",
+      "title": "混音 + 成片合成",
+      "spec": "docs/assets/specs/m9-mix.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "T15 定案"
+    },
+    {
+      "id": "M10",
+      "title": "按镜头分流口型",
+      "spec": "docs/assets/specs/m10-lipsync.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "D1 回炉补篇 2026-10-02"
+    },
+    {
+      "id": "M11",
+      "title": "字幕擦除 + 目标语渲染",
+      "spec": "docs/assets/specs/m11-subs.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "T8 冻结批"
+    },
+    {
+      "id": "M12",
+      "title": "合规标识（显式/C2PA/音频水印）",
+      "spec": "",
+      "status": "planned",
+      "blocker": "D4 模块入库前不补 spec（以 pipeline/m12_compliance.py 实现为蓝本）",
+      "notes": "当前 e2e_smoke.sh 内为 M12 最小替身（PIL overlay）"
+    },
+    {
+      "id": "M13",
+      "title": "审校台 Web",
+      "spec": "docs/assets/specs/m13-review.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "D1 回炉补篇 2026-10-02"
+    },
+    {
+      "id": "M14",
+      "title": "任务队列与编排",
+      "spec": "docs/assets/specs/m14-queue.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "D1 回炉补篇 2026-10-02；M10 artifact 槽位已修正；全局拓扑同序校验点见 pipeline/queue.py DEFAULT_GRAPH（m10-m15 段）"
+    },
+    {
+      "id": "M15",
+      "title": "指标体系",
+      "spec": "docs/assets/specs/m15-metrics.md",
+      "status": "frozen",
+      "blocker": "",
+      "notes": "D1 回炉补篇 2026-10-02；CallLedger 落库 pipeline/m15_metrics/_common.py"
+    }
+  ],
+  "updated_at": "2026-10-02"
+}

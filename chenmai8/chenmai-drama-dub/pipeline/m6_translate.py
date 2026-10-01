@@ -78,6 +78,9 @@ _AR_DIACRITIC = re.compile(r"[\u064b-\u0652\u0670]")
 def count_syllables(text: str, lang: str) -> int:
     """规则音节计数（占位 G2P：pypinyin/词典 G2P/阿语简化法待拟合批替换）。
 
+    占位口径：当前为规则近似，拟合表(models/syl2dur.json)回填前不可信；
+    真实时长对齐须等 M15 duration_alignment_rate 或 GPU 机批量 G2P 回填后方可关闭本项。
+
     - zh/yue/ja：CJK 字数（每字 ≈1 音节；假名同口径）；
     - en：每词元音簇数（[aeiouy]+ 连串，词内至少 1）；
     - es：元音数（西语音节核即元音，规则天然贴合）；

@@ -514,6 +514,10 @@ def align_episode(
             "n_unresolved": len(unresolved),
             "n_aligned": len(aligned_ids),
             "alignment_rate": round(len(aligned_ids) / n_total, 3) if n_total else 0.0,
+            # alignment_type 口径说明：M8 以 plan-based（候选窗命中）定义 aligned；
+            # M15 duration_alignment_rate 以 models/syl2dur.json 回填后的真实时长
+            # 对齐率计算——两者在拟合表回填前数值不可比，勿混用。
+            "alignment_type": "plan-based (syl2dur placeholder)",
             "atempo_ratio": round(n_atempo / n_synth, 3) if n_synth else 0.0,
             "mean_speed_adj": (
                 round(sum(synth_speeds) / len(synth_speeds), 3)

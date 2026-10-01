@@ -127,7 +127,7 @@ SERVICE_DEPS: dict[str, tuple[str, ...]] = {
 
 #: 生产默认步骤图（与 scripts/e2e_smoke.sh 的链路同序；m12/M12 模块与
 #: m13/M13 审校台落地后按"只增"补入本表）：
-#:   共享(ep): m1 → m3 → m4 → m2 → m5；逐语种: m6 → m8 → m7 / m11 → m9 → m10 → m15
+#:   共享(ep): m1 → m3 → m4 → m2 → m5；逐语种: m6 → m8 → m7 / m11 → m9 → m10 → m12 → m15
 #: m4 的 CLI 暂无 ``--jobs-dir``（T5 骨架形态），自定 jobs_dir 时用 --graph 覆盖该步。
 DEFAULT_GRAPH: dict[str, StepSpec] = {
     "m1": StepSpec(
@@ -197,14 +197,20 @@ DEFAULT_GRAPH: dict[str, StepSpec] = {
         "m10",
         ("{python}", "-m", "pipeline.m10_lipsync", "--ep", "{ep}",
          "--lang", "{lang}", "--jobs-dir", "{jobs_dir}"),
-        deps=("m9",), artifact="09_lip/lip_plan.{lang}.jsonl",
+        deps=("m9",), artifact="09_lip/done/{ep}.{lang}.lip.mp4",
         services=SERVICE_DEPS["m10"], scope="lang",
+    ),
+    "m12": StepSpec(
+        "m12",
+        ("{python}", "-m", "pipeline.m12_compliance", "--ep", "{ep}",
+         "--lang", "{lang}", "--jobs-dir", "{jobs_dir}"),
+        deps=("m10",), artifact="12_out/compliance_report.json", scope="lang",
     ),
     "m15": StepSpec(
         "m15",
         ("{python}", "-m", "pipeline.m15_metrics", "--ep", "{ep}",
          "--lang", "{lang}", "--jobs-dir", "{jobs_dir}"),
-        deps=("m10",), artifact="12_out/metrics.json", scope="lang",
+        deps=("m12",), artifact="12_out/metrics.json", scope="lang",
     ),
 }
 

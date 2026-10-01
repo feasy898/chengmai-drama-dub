@@ -87,7 +87,8 @@ nohup bash ops/tunnel_gpu.sh keepalive >> tmp/tunnel_keepalive.log 2>&1 &      #
 
 ```
 0 契约(pipeline/contracts.py)+原语+scaffold → 1 M1 → 2 M2 → 3 M3 → 4 M4(:9001 在线)
-→ 5 M5 → 6 M6(mock 全离线，可与 4/5 并行) → 7 M11 → 8 M8 → 9 M9 → 10 M7(:9002 在线) → 11 三道门
+→ 5 M5 → 6 M6(mock 全离线，可与 4/5 并行) → 7 M11 → 8 M8 → 9 M9 → 10 M7(:9002 在线)
+→ 11 M10(:9003 在线) → 12 M15 → 13 M13 → 14 M14(队列编排) → 15 四道门(B0-B4) + e2e
 ```
 
 每步"验收命令 → 通过线"（详见各 spec §eval 与 manifest 表）：
@@ -105,6 +106,10 @@ nohup bash ops/tunnel_gpu.sh keepalive >> tmp/tunnel_keepalive.log 2>&1 &      #
 | 8 | M8 | `bash scripts/eval_m8.sh` | 10 passed；对齐率 ≥0.70；七类路径全触发 |
 | 9 | M9 | `bash scripts/eval_m9.sh` | 17 passed；时长差 ≤0.2s；响度 ±1LU；峰值比 ≥8dB |
 | 10 | M7 | `TUNNEL_LOCAL_PORT=9002 TUNNEL_REMOTE_PORT=9002 bash ops/tunnel_gpu.sh start && bash scripts/eval_m7.sh` | 11 passed（4 离线+7 在线） |
+| 11 | M10 | `pytest tests/test_m10_lipsync.py` | C6 分流纯逻辑 + 回贴自验；:9003 服务组 skip 时 --skip-gpu 豁免 |
+| 12 | M15 | `pytest tests/test_m15_metrics.py` | 六项出数 exit 0；数值如实不做阈值门禁 |
+| 13 | M13 | `pytest tests/test_review_console.py` | httpx ASGI e2e；:9002 不可达时整组 skip 并注明归因 |
+| 14 | M14 | `python -m pipeline.cli status`（配合 enqueue/resume 子命令） | 队列 SQLite DDL + 图校验 + ledger_from_metrics_db 产出 CallLedger |
 
 ## 4. 全仓验收（三道门）
 
@@ -114,6 +119,9 @@ python scripts/gate_b1.py [--skip-gpu]    # M1–M4（含真模型 CPU 推理，
 python scripts/gate_b2.py [--skip-gpu]    # M5/M6/M7（超时预算：单项 1800s / 整门 3600s）
 python scripts/gate_b3.py [--skip-gpu]    # M8/M9/M11 + gate_b2 整门回归（同预算；全门墙钟 ~55 分钟量级，
                                           # 外部超时帽需 ≥60min）
+python scripts/gate_b4.py [--skip-gpu]    # M10/M15/e2e 收口 + gate_b3 回归（B4 批次，3600s 整门预算）
+bash scripts/e2e_smoke.sh --langs en      # 端到端冒烟（单语最小收敛面；:9001/:9002 必需，:9003 可选）
+python tests/check_e2e.py --ep e2e01 --langs en   # e2e 断言集（时长/字幕/AI 标识/metrics/非口型帧/配音铺满）
 ```
 - 整门记录（2026-09-29）：B3 6/6 PASS 3469s/3600s——177 passed 零跳过（M11 24 / M8 10 / M9 17 / gate_b2 子进程整门回归）。
 
@@ -188,5 +196,6 @@ python scripts/gate_b3.py [--skip-gpu]    # M8/M9/M11 + gate_b2 整门回归（�
 | T14（81485e6）/ T8（aca8b08）/ T15（99011c1+bec2459） | M8 / M11 / M9（+models.yaml mix-m9、align-m8 登记） |
 | T16/B3（b25fc4b） | gate_b3 四道门收口（6/6 PASS 3469s，177 passed 零跳过） |
 | （本 commit） | docs/assets/ 四件套（manifest / specs×13 / REGENERATE / CONTRACTS） |
+| D1 回炉（2026-10-02） | 补写 specs×4（m10/m13/m14/m15）；manifest 状态翻转；M15 CallLedger 落库 pipeline/m15_metrics；M10 artifact 槽位修正为 09_lip/done/{ep}.{lang}.lip.mp4；REGENERATE 步骤/门入口增补 |
 | 回炉二稿（2026-09-30） | 首轮重生成试点缺口回填：m1-ingest spec 二稿（收件固定名 input.mp4 / 产物名随 targets 联动模板 / probe.json 全 schema+loudness 8 字段 / config 键位与 jobs_dir 解析语义 / CLI stdout 逐字形态 / exit 2=argparse SystemExit / `audio=skip` 位置修正：stdout 而非 probe.json）+ contract-io §3 LAYERS/EXPECTED_FILES 全表自含化 |
 | 二轮裁定钉死（2026-09-30，接 134357d） | _regen2/drama2 二轮盲重生成 7 条被迫裁定逐条收口（m1-ingest spec）：loudness_lufs falsy（0 等 falsy 一律取 -16.0，or 语义）与源探针收件副本缺失回退原路径两处行为级已随 134357d 入文；本次补钉 IngestError 消息全文五种冻结（§3）、M1 重生成自含副本形态（§2.1）、`pipeline/__init__.py` 面归属（contracts 再导出面非 M1 面、bootstrap 在 m2_ocr.py:27，§5）、重生成 gate 形态（冻结测试 sha256 夹具 + PATH 前置预检 + skipped 即 FAIL，§5）、二轮盲重生成输入面披露（§5） |

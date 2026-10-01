@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-10-01T18:46:21.505Z",
+  "sessionId": "sess_dwf-dwfrun-a2f10564-0ea0-4464-9e85-b10b22dcdb67-actor_4_5",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "chenmai8/chenmai-drama-dub/README.md",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 399,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

@@ -484,6 +484,57 @@ def check_dub_coverage(cnt: _Cnt, ws: Path, lang: str) -> None:
         cnt.rec(False, "⑦ C2 音轨配音铺满", f"执行异常: {exc}")
 
 
+def check_overflow(cnt: _Cnt, ws: Path, lang: str) -> None:
+    """⑧ align_report 句窗超裁：非 keep-original/no-translation 句 pred_dur 须落在 window[lo,hi]。"""
+    try:
+        align_path = ws / "07_synth" / f"align_report.{lang}.json"
+        if not align_path.is_file():
+            cnt.rec(False, "⑧ 句窗超裁", f"align_report 缺失: {align_path}")
+            return
+        report = json.loads(align_path.read_text(encoding="utf-8"))
+        overflow: list[str] = []
+        skipped = 0
+        for item in report.get("items", []):
+            status = item.get("status", "")
+            if status in ("keep-original", "no-translation"):
+                skipped += 1
+                continue
+            pred = item.get("pred_dur")
+            window = item.get("window", [])
+            if pred is None or len(window) != 2:
+                continue
+            lo, hi = window
+            if pred < lo or pred > hi:
+                overflow.append(
+                    f"{item.get('utt_id')} pred_dur={pred:.3f}s window=[{lo:.3f},{hi:.3f}]"
+                )
+        ok = not overflow
+        cnt.rec(ok, "⑧ 句窗超裁（align_report 逐句 pred_dur vs window）",
+                f"可检句 {(len(report.get('items', [])) - skipped)} 个，"
+                f"跳过 keep-original/no-translation {skipped} 个；"
+                + (f"超窗句:\n" + "\n".join(overflow) if overflow else "全部在窗内"))
+    except Exception as exc:  # noqa: BLE001
+        cnt.rec(False, "⑧ 句窗超裁", f"执行异常: {exc}")
+
+
+def check_truncation(cnt: _Cnt, ws: Path, ep: str, lang: str, final: Path) -> None:
+    """ utterances 末句 end 时间戳 vs 12_out 最终 ffprobe 时长差 ≤0.1s。"""
+    try:
+        from pipeline import contracts as C
+
+        utts = C.load_jsonl(ws / "04_dial" / "utterances.jsonl", C.UtteranceTable).root
+        if not utts:
+            cnt.rec(False, "⑨ 末句截断对齐", "utterances.jsonl 为空")
+            return
+        last_end = max(u.end for u in utts)
+        final_dur = ffprobe_duration(final)
+        diff = abs(final_dur - last_end)
+        cnt.rec(diff <= 0.1, "⑨ 末句截断对齐（ utterances 末句 end vs 成片时长）",
+                f"末句 end={last_end:.3f}s 成片时长={final_dur:.3f}s |Δ|={diff:.3f}s（阈值 ≤0.1）")
+    except Exception as exc:  # noqa: BLE001
+        cnt.rec(False, "⑨ 末句截断对齐", f"执行异常: {exc}")
+
+
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
@@ -567,6 +618,8 @@ def main(argv: list[str] | None = None) -> int:
         check_non_lip_frames(cnt, ws, ns.ep, lang, final, out12, clean,
                              master, band, label_zone)
         check_dub_coverage(cnt, ws, lang)
+        check_overflow(cnt, ws, lang)
+        check_truncation(cnt, ws, ns.ep, lang, final)
         all_fail += cnt.fail_n
         print(f"   （{lang}: {cnt.pass_n} PASS / {cnt.fail_n} FAIL）")
 
