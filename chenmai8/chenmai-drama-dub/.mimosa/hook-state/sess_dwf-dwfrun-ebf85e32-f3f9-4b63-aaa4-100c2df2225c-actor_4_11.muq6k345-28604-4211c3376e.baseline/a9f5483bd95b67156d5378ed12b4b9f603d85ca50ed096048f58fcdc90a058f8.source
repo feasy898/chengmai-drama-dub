@@ -85,35 +85,9 @@ probe_port() { curl -sf -m 3 "http://127.0.0.1:$1/health" >/dev/null 2>&1; }
 ensure_tunnel() {  # ensure_tunnel <port> <必需 yes|no> <名称>
   local port="$1" required="$2" name="$3" i
   if probe_port "$port"; then say "tunnel :$port ($name) already UP"; return 0; fi
-
-  local lockfile="$ROOT/tmp/.ensure_tunnel_${port}.lock"
-  # 单实例锁日志（pidfile 实现，兼容 Windows Git Bash）
-  if [ -f "$lockfile" ]; then
-    local holder
-    holder=$(cat "$lockfile" 2>/dev/null || echo "")
-    if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then
-      say "tunnel :$port ($name) 单实例锁: PID=$holder 持有中，等待释放"
-      for i in 1 2 3 4 5 6; do
-        sleep 5
-        if ! kill -0 "$holder" 2>/dev/null; then
-          rm -f "$lockfile"
-          break
-        fi
-      done
-      if [ -f "$lockfile" ]; then
-        say "tunnel :$port ($name) 单实例锁等待超时"
-        [ "$required" = "yes" ] && exit 1 || return 1
-      fi
-    else
-      rm -f "$lockfile"
-    fi
-  fi
-  echo $$ > "$lockfile"
-  say "tunnel :$port ($name) 单实例锁已获取 PID=$$"
-
   TUNNEL_LOCAL_PORT="$port" TUNNEL_REMOTE_PORT="$port" bash ops/tunnel_gpu.sh start >> "$LOG" 2>&1
   for i in 1 2 3; do
-    probe_port "$port" && { rm -f "$lockfile"; say "tunnel :$port ($name) UP"; return 0; }
+    probe_port "$port" && { say "tunnel :$port ($name) UP"; return 0; }
     sleep 5
   done
   # 公网链路周期性 reset：等 60s 重拉一轮再判（通用上下文：遇限流等 60s）
@@ -121,18 +95,16 @@ ensure_tunnel() {  # ensure_tunnel <port> <必需 yes|no> <名称>
   sleep 60
   TUNNEL_LOCAL_PORT="$port" TUNNEL_REMOTE_PORT="$port" bash ops/tunnel_gpu.sh restart >> "$LOG" 2>&1
   for i in 1 2 3; do
-    probe_port "$port" && { rm -f "$lockfile"; say "tunnel :$port ($name) UP（重试后）"; return 0; }
+    probe_port "$port" && { say "tunnel :$port ($name) UP（重试后）"; return 0; }
     sleep 5
   done
   if [ "$required" = "yes" ]; then
     say "SKIP-GPU: GPU 服务 :$port ($name) 不可达（隧道两轮重试无效）。"
     say "  ASR/TTS 是本 e2e 的被测对象，不可达时不伪造结果——请先 bash ops/tunnel_gpu.sh start"
     say "  并确认 GPU 机服务常驻（gpu-services/*/run_gpu.sh），再重跑；或 --langs en 缩小面。"
-    rm -f "$lockfile"
     exit 1
   fi
   say "SKIP-LIP: GPU 服务 :$port ($name) 不可达——口型阶段跳过（m10 仅出空计划），链路继续。"
-  rm -f "$lockfile"
   return 1
 }
 

@@ -152,6 +152,9 @@ python tests/check_e2e.py --ep e2e01 --langs en   # e2e 断言集（时长/字�
 > 若句窗超裁（⑧）或末句截断对齐（⑨）任一 FAIL，全链成片存在截断风险，
 > 建议演示字幕擦除/AI 标识对比片段。
 
+**播出门控**：`alignment_type=plan-based` 且 GPU 真实验证通过前，**禁播** `12_out` 全链成片；
+只播字幕擦除对比、AI 标识对比等无配音时长承诺的安全片段。
+
 **演示前显存互斥核查项（SOP）**：
 1. 确认 `:9002 /health` 中 `loaded.alt-tts-b=false`（备选链未触发懒加载）。
 2. 若需启动 lip-pro，先停 :9002 服务或确认 alt-tts-b 权重目录不可达（`loaded.alt-tts-b=false`）。
@@ -160,8 +163,16 @@ python tests/check_e2e.py --ep e2e01 --langs en   # e2e 断言集（时长/字�
 
 **演示日 checklist**：
 
+- [ ] 禁 CLI queue（生产/演示禁止使用 `python -m pipeline.cli run`，走 scripts/e2e_smoke.sh）
 - [ ] queue 重放排期待 GPU 就绪（GPU 机 :9003 lip 服务健康 + 隧道通）
 - [ ] gate_b4 ⑦ 显存互斥断言 PASS（`loaded.alt-tts-b=false` + 日志无 lazy-load 关键词）
+- [ ] **无 12_out 全链成片**：演示材料清单不含 `jobs/<ep>/12_out/*.mp4`，仅播字幕擦除对比、AI 标识对比等安全片段
+
+**演示材料客观可验证项主推顺序**：
+
+1. 非口型帧不变 —— M10 帧哈希自验（`09_lip/lip_report.<lang>.json` verify.ok）
+2. 字幕擦除 OCR=0 —— M11 擦除带 OCR 复判（`eval_m11.sh` 断言）
+3. 成片时长差 0.0000 —— M1 probe.json duration_s vs M9 mix_report duration_s 对账
 
 ## 5. 替换/重生成模块时的回归清单
 
@@ -210,7 +221,7 @@ python tests/check_e2e.py --ep e2e01 --langs en   # e2e 断言集（时长/字�
 :9001/:9004 断则 ASR/翻译全链瘫换。定案三件套：
 
 1. **keepalive 常驻**：每端口一个 `bash ops/tunnel_gpu.sh keepalive` nohup 进程
-   （日志 `tmp/tunnel_keepalive.log`），自动检测断连并按 `ops/tunnel_gpu.sh restart` 拉起；
+   （日志 `tmp/tunnel_<port>.log`），自动检测断连并按 `ops/tunnel_gpu.sh restart` 拉起；
    单实例锁防并发叠加（B1 批冻结）。
 2. **60s 重试窗**：e2e / eval 脚本遇端口不可达时，先等 60s 再拉一轮重试
    （不并发叠加请求——同 keepalive 拉起失败不并发叠加的纪律）；
@@ -218,6 +229,49 @@ python tests/check_e2e.py --ep e2e01 --langs en   # e2e 断言集（时长/字�
 3. **录屏兜底 SOP**：排查隧道 flapping 时，在 GPU 机侧 `asciinema rec /tmp/tunnel-debug.cast`
    或本机录屏，记录 `curl -v /health`、`ps -ef | grep ssh`、`tunnel_keepalive.log` 尾部；
    复现后以时间线对齐 ssh 断开与服务探测失败，确认为链路层问题后再走 `ops/tunnel_gpu.sh restart`。
+
+#### 6.1.1 keepalive 常驻 SOP
+
+```bash
+# 启动三个端口的 keepalive（每端口独立 nohup 进程）
+nohup bash ops/tunnel_gpu.sh start >> tmp/tunnel_9001.log 2>&1 &
+nohup bash ops/tunnel_gpu.sh start >> tmp/tunnel_9002.log 2>&1 &
+nohup bash ops/tunnel_gpu.sh start >> tmp/tunnel_9004.log 2>&1 &
+
+# 或分别启动 keepalive 常驻进程
+nohup bash ops/tunnel_gpu.sh keepalive >> tmp/tunnel_keepalive_9001.log 2>&1 &
+nohup bash ops/tunnel_gpu.sh keepalive >> tmp/tunnel_keepalive_9002.log 2>&1 &
+nohup bash ops/tunnel_gpu.sh keepalive >> tmp/tunnel_keepalive_9004.log 2>&1 &
+```
+
+- **验证 keepalive 在运行**：
+  ```bash
+  bash ops/tunnel_gpu.sh status    # 应返回 exit 0 + "运行中"
+  tail -f tmp/tunnel_9001.log      # 观察周期探测输出
+  ```
+- **单实例锁**：`ensure_tunnel()` 与 `keepalive` 均通过 pidfile 实现单实例锁，
+  同端口并发调用会等待或退出，避免叠加重启请求。
+- **故障升级**：若 keepalive 在 60s 内重启同一端口超过 3 次，停止 keepalive，
+  保留 `tmp/tunnel_<port>.log` 与 `tmp/tunnel_keepalive_<port>.log` 证据，
+  人工排查 ssh 链路或 GPU 机服务状态后再手动 `bash ops/tunnel_gpu.sh restart`。
+
+#### 6.1.2 录屏兜底流程
+
+排查隧道 flapping 的标准录屏流程：
+
+1. **准备记录**：在 GPU 机侧执行 `asciinema rec /tmp/tunnel-debug.cast`，
+   或本机启动屏幕录制；同时新开终端执行：
+   ```bash
+   curl -v http://127.0.0.1:9001/health
+   ps -ef | grep ssh | grep -v grep
+   tail -n 50 tmp/tunnel_keepalive_9001.log
+   ```
+2. **复现等待**：保持记录运行，等待隧道中断并观察 keepalive 自动恢复；
+   若 60s 内未恢复，记录时间戳与 curl 输出。
+3. **时间线对齐**：录制结束后，以时间线对照 ssh 断开日志、服务探测失败点、
+   keepalive restart 操作，确认是链路层问题还是 GPU 机服务异常。
+4. **定案**：确认为链路层问题后，保留 recording 与日志，走 `ops/tunnel_gpu.sh restart`；
+   若为服务异常，联系 GPU 机侧运维检查 `gpu-services/*/run_gpu.sh` 状态。
 
 > 隧道不走 tailnet 数据面（本机→GPU 方向实测不通），走 ssh config 公网 Host 条目；
 > 服务零公网暴露。坑与定案详见 [specs/gpu-tunnel.md](specs/gpu-tunnel.md)。

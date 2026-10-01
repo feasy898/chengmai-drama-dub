@@ -4,59 +4,48 @@
     "pyCompilePass": 14,
     "pyCompileFail": 0,
     "pyCompileFailFiles": [],
-    "totalVerified": 9,
-    "totalRemaining": 3,
-    "diffLines": 77
+    "totalVerified": 8,
+    "totalRemaining": 4,
+    "diffLines": 311
   },
   "fixReports": [
     {
-      "itemId": "R6",
-      "whatChanged": "cmd_run 入口增加演示风险 stderr 打印；run 子命令 epilog 增加演示风险语注；Queue.run docstring 补充生产/演示推荐路径与未端到端验证说明。",
+      "itemId": "D3",
+      "whatChanged": "新增 pipeline/material_fetch.py 作为素材唯一入口并抽离 e2e_smoke 内联生成逻辑；scripts/e2e_smoke.sh 改为调用 material_fetch；REGENERATE.md 与 m1-ingest.md 同步注册契约与步骤。",
       "selfCheckOk": true,
-      "residualRisk": "无。"
+      "residualRisk": "需 GPU 真验证：material_fetch 的合成回退依赖本机 SAPI/ffmpeg/OpenCV/PIL/SAPI 语音合成路径，当前仅在无 clips/jobs 的仓库环境下做了语法与 CLI 帮助验证，未跑完整 e2e_smoke.sh。"
     },
     {
-      "itemId": "R1",
-      "whatChanged": "docs/assets/REGENERATE.md §6 拆分为隧道节(§6.1)与网络镜像节(§6.2)，补充 keepalive/60s 重试窗/录屏兜底 SOP；scripts/e2e_smoke.sh 头部注释补充 tunnel_gpu.sh 版本化管理与 ensure_tunnel 调用语义。",
-      "selfCheckOk": false,
-      "residualRisk": "specs/gpu-tunnel.md 文件在 monorepo 中不存在；REGENERATE.md §6.1 引用了该文档。该引用在原 §2.3 已存在，非本次新增。"
+      "itemId": "D5",
+      "whatChanged": "为 queue.py 与 e2e_smoke.sh 的 DEFAULT_GRAPH/链路头部新增『同序校验点』互注；在 REGENERATE.md §4.1 演示日 checklist 新增『queue 重放排期待 GPU 就绪』条目。",
+      "selfCheckOk": true,
+      "residualRisk": "1.  在 monorepo 内未找到，无法执行 ops/ 台账 GPU 排期待 owner 确认（且 ops/ 不在本次涉及文件列表中，未改动台账文件）。2. m10 artifact 的 GPU 真验证（:9003 lip 服务回传产物）本 session 未具备隧道条件，属需 GPU 环境后续确认项。"
     },
     {
-      "itemId": "R3",
-      "whatChanged": "tests/check_e2e.py 的 check_overflow 失败时打印红色 DEMO GATE 警告；docs/assets/REGENERATE.md 演示日 gate 节增补 check_e2e.py ⑧⑨ PASS 是全链成片演示的前置条件。",
+      "itemId": "R2",
+      "whatChanged": "在 m7-tts.md 新增显存互斥矩阵与禁触条件；在 gate_b4.py 新增 check ⑦ 硬断言（/health loaded.alt-tts-b + e2e 日志 lazy-load 关键词扫描）；在 REGENERATE.md 演示前 SOP 新增显存互斥核查项。",
       "selfCheckOk": true,
-      "residualRisk": "e2e01 工作区不存在且 pipeline/config.py 缺失，无法运行 python tests/check_e2e.py --ep e2e01 --langs en 做完整集成验证；警告代码路径已通过隔离函数测试验证。GPU: false。"
-    },
-    {
-      "itemId": "R5",
-      "whatChanged": "compute_metrics 返回的 summary 新增 demo_recommended 列表（自动排除 method 含 placeholder 的指标 + 硬纳入 lip_score/cost_per_minute）；review_server 新增 GET /api/tasks/{task_id}/metrics 端点优先展示 demo_recommended 节。",
-      "selfCheckOk": true,
-      "residualRisk": "1) 三个 placeholder 指标（speaker_similarity=1.0 / emotion_similarity=1.0 / listen_wer=0.0）仍是硬编码假值，demo_recommended 仅展示层隐藏，未消除底层数据失真；2) CLI 验收（python -m pipeline.m15_metrics --ep ep01 --lang en）未实际执行——当前 workspace 无完整上游产物（M8/M9/M10 报告 + M14 metrics.db），命令会因 MetricsError 提前失败，无法端到端验证输出；3) 前端 review_server 页面代码未同步新增 demo_recommended 可视化面板，API 已就绪但 UI 不会自动展示，需后续前端改动补齐。"
+      "residualRisk": "GPU 真验证未在本会话执行：需要 GPU 机 cuda:1 已被 lip-fast/lip-pro 占用时，向 :9002 发 engine=alt-tts-b 请求，确认 /health loaded.alt-tts-b 变为 true 且 e2e 日志出现 lazy-load 关键词，从而端到端验证 check ⑦ 的 FAIL 路径。"
     }
   ],
   "confirms": [
     {
-      "itemId": "R6",
+      "itemId": "D3",
       "verified": true,
-      "gap": "无"
+      "gap": "需 GPU 真验证：material_fetch 的合成回退依赖本机 SAPI/ffmpeg/OpenCV/PIL/SAPI 语音合成路径，当前仅在无 clips/jobs 的仓库环境下做了语法与 CLI 帮助验证，未跑完整 e2e_smoke.sh。"
     },
     {
-      "itemId": "R1",
+      "itemId": "D5",
       "verified": true,
-      "gap": "specs/gpu-tunnel.md 在 monorepo 中缺失；REGENERATE.md §6.1 引用该文档，但该引用非本次新增（原 §2.3 已存在）。"
+      "gap": "1. 未在 GPU 隧道条件下验证 m10 真实验证（:9003 lip 服务回传产物）。2. jobs.db 台账 GPU 排期待 owner 确认（ops/ 不在本次涉及文件列表中）。"
     },
     {
-      "itemId": "R3",
+      "itemId": "R2",
       "verified": true,
-      "gap": "e2e01 工作区不存在且 pipeline/config.py 缺失，无法运行 python tests/check_e2e.py --ep e2e01 --langs en 做完整集成验证；警告代码路径已通过代码审查 + py_compile 验证。"
-    },
-    {
-      "itemId": "R5",
-      "verified": true,
-      "gap": "placeholder 硬编码假值未消除；CLI 端到端未执行；前端页面未新增 demo_recommended 可视化面板。"
+      "gap": "GPU 真验证未在本会话执行：需在 cuda:1 被 lip-fast/lip-pro 占用时向 :9002 发 engine=alt-tts-b 请求，确认 /health loaded.alt-tts-b 变为 true 且 e2e 日志出现 lazy-load 关键词，从而端到端验证 check ⑦ FAIL 路径。"
     }
   ],
-  "totalVerified": 9,
+  "totalVerified": 8,
   "totalItems": 12,
   "maxRounds": 4
 }
