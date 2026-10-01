@@ -8,6 +8,10 @@
 > M1 重生成自含副本形态（§2.1）、`pipeline/__init__.py` 面归属 + 重生成 gate 形态 + 二轮输入面（§5）。
 > 上游依赖：系统级 ffmpeg/ffprobe（PATH 可解析，硬依赖）；Python 侧仅 `pipeline/config.py` 的 YAML 读取
 > （PyYAML，requirements.txt 未显式钉版、经依赖连带在库）——`m1_ingest`/`scaffold` 本体零第三方、零模型依赖。
+>
+> 素材前置：`pipeline/material_fetch.py` 是素材唯一入口。M1 的 `--in` 应对接 material_fetch 的 `--out`
+> （默认 `clips/<ep>_raw.mp4`）。material_fetch 默认走真实素材 fetch；fetch 失败或无源时回退到 `_generate_synthetic()`
+> （抽离自 `scripts/e2e_smoke.sh` 原内联 heredoc，行为等价）。
 
 ## 1. 职责与边界
 
@@ -96,6 +100,30 @@
   时长口径 = `format.duration`（round 3 位小数），缺失时取各流 duration 最大值（仍无则 0.0）；
   `max_abs_delta_s` = 各产物与源 |Δ| 的最大值（round 3，无音频产物时只算 video；无任何产物时 `null`）。
 - 写盘：`json.dumps(..., ensure_ascii=False, indent=2) + "\n"`（utf-8；probe.json 不走契约写盘原语）。
+
+### 2.5 material_fetch 契约（上游素材入口）
+
+`pipeline/material_fetch.py` 是 M1 的唯一直连素材入口；`scripts/e2e_smoke.sh` 及任何新脚本不得绕过它直造素材。
+
+- 输入：
+  - `--ep <ep>`：集 ID。
+  - `--source <path_or_url>`：真实素材源（本地路径或 http/https URL）。URL 仅允许 http/https，发请求前校验 host，拒绝 localhost、环回、私有和保留地址。
+  - `--out <path>`：输出素材路径（默认 `clips/<ep>_raw.mp4`）。
+- 输出：
+  - 成功：JSON 文档（stdout），至少包含 `ep`、`clip`、`duration_s`、`source`、`method`（`fetch` 或 `synthetic`）。
+  - 产物：`clips/<ep>_raw.mp4`（或 `--out` 指定路径）。
+- 失败回退：
+  - `fetch_real()` 失败（网络异常、源不可达、私有地址拒绝等）→ stderr 打印 `WARN fetch 失败: ...`，自动回退 `_generate_synthetic()`。
+  - 未传 `--source` → stderr 打印 `INFO 未提供素材源，回退合成`，直接走 `_generate_synthetic()`。
+  - `--synthetic` 可强制跳过 fetch。
+- 幂等/增量：
+  - `--only-missing`：输出已存在时直接返回 `status=exists, skipped=true`，不重 fetch/不重合成。
+  - `--list [--ep]`：列出素材状态（`exists`/`missing`），不生成素材。
+- 安全：
+  - HTTP(S) fetch 前必须通过 `_is_private_host()` 校验，拒绝 RFC 1918 / loopback / ULA / 169.254.0.0/16。
+- 与 M1 的对接：
+  - M1 `--in` 直接使用 `material_fetch` 的 `--out` 产物；M1 不感知素材来源（真实 fetch 还是 synthetic）。
+  - `_generate_synthetic()` 的硬编码台词/时间轴/字体路径与 `scripts/e2e_smoke.sh` 原内联 heredoc 行为等价（首句 3.2s、句间 1.0s、末句后 1.0s 静默、25fps、1080x1920）。
 
 ## 3. CLI（冻结形态）与退出码
 

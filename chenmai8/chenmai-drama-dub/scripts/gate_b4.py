@@ -44,7 +44,9 @@
     （其 docstring 构成记录：⑤gate_b2 整门重跑 1661s + ①全量套件 1221s + 其余
     各项），超单项帽 1800s 近一倍、也必然耗尽整门剩余预算——如实注明，不放松
     判定口径；
-  ⑥ 中性名扫描：直接复用 gate_b0 同一实现（台账附录A 强校验 + 公开文件零命中）。
+  ⑥ 中性名扫描：直接复用 gate_b0 同一实现（台账附录A 强校验 + 公开文件零命中）；
+  ⑦ M7 显存互斥硬断言：:9002 /health 的 loaded.alt-tts-b 必须为 false，且
+    tmp/e2e_smoke.log 不含 lazy-load 相关关键词（alt-tts-b loaded / lazy load）。
 
 超时预算（T13 定案，单项 1800s / 整门 3600s）：每项子进程超时取
 min(本项帽, 整门剩余预算)，整门预算耗尽后剩余项直接判 FAIL 并注明。唯一例外：
@@ -55,10 +57,11 @@ min(本项帽, 整门剩余预算)，整门预算耗尽后剩余项直接判 FAI
 构成（2026-09-30 自验收，三跑如实记录：run1 ① 全量套件在 1800s 旧项帽处被杀
 （208 passed 探针实测 1847s）→ 套件帽改 b0 的 3600s；run2 与另一项目门禁
 （90 分钟）共享负载窗口，①1919+②140+③135+④704 耗尽 3600s 致 ⑤ 被剩余帽
-精确卡死（5/6）；run3 对方门禁收口后的空窗整门 6/6，墙钟 3104s/3600s）：
+精确卡死（5/6）；run3 对方门禁收口后的空窗整门 6/6，墙钟 3104s/3600s；
+⑦ 为后续新增项，预估 ~5s，不影响整门预算）：
 ①=1553s（208 passed）> ⑤=704s（m8/m9/m11 合计 51 passed）> ④=539s（exit=0，
-单语 en）> ③=155s（16 passed）> ②=151s（15 passed）> ⑥≈2s——主项合计
-3104s（占整门预算 86%；共享负载高峰实测可把 ①③④ 抬 ~20-30%（run2），
+单语 en）> ③=155s（16 passed）> ②=151s（15 passed）> ⑥≈2s > ⑦≈5s——主项合计
+3110s（占整门预算 86%；共享负载高峰实测可把 ①③④ 抬 ~20-30%（run2），
 后续项可能因预算耗尽判 FAIL，如实注明，不放松判定口径）。
 
 环境注记（随输出尾部如实打印）：
@@ -142,7 +145,7 @@ ENV_NOTES = [
     "环境注记1: ①②③④ 含真模型推理(OCR/分离/声纹 CPU 真模型，全量套件 208 用例实测 1548~1920s 随共享负载)，整门墙钟预算 3600s（实测 3104~3600s），外部超时帽需自配 >=60min",
     "环境注记2: ①②③④ 依赖 ssh 隧道 127.0.0.1:9001(asr_align)/9002(tts)/9003(lip)，公网链路周期性 reset，ops/tunnel_gpu.sh keepalive 秒级自愈；--skip-gpu 豁免仅覆盖'服务不可达'类跳过",
     "环境注记3: ④ 依赖 Git Bash(bash/curl)+ffmpeg 在 PATH 与本机 SAPI zh 声库；:9003 不可达时 e2e 内部 SKIP-LIP 继续（成片=12_out，断言集容差口径）",
-    "环境注记4: 显存互斥(models.yaml 部署矩阵): lip-fast 常驻 cuda:1 与 :9002 备选引擎同卡互斥；本门只走常驻服务，不触发备选引擎懒加载",
+    "环境注记4: 显存互斥(models.yaml 部署矩阵): lip-fast 常驻 cuda:1 与 :9002 备选引擎同卡互斥；本门只走常驻服务，不触发备选引擎懒加载（见 check ⑦ 硬断言）",
 ]
 
 _T0 = time.monotonic()
@@ -315,6 +318,48 @@ def check_m15() -> tuple[bool, str]:
     return _pytest_item([M15_TEST_FILE])
 
 
+def check_m7_lazy_load() -> tuple[bool, str]:
+    """⑦ 显存互斥硬断言：:9002 可达时检查 alt-tts-b 未懒加载（/health loaded 表 + e2e 日志关键词扫描）。"""
+    tts_state = b2.tts_service_state()[0]
+    if tts_state == "unreachable":
+        return None, "[--skip-gpu] :9002 不可达，跳过 lazy-load 断言"
+    if tts_state != "up":
+        return False, f":9002 服务状态异常（{tts_state}），无法完成 lazy-load 断言"
+    # 通过 .venv 探测桥读取 /health loaded 表
+    vpy = b0.venv_python()
+    if vpy is None:
+        return False, "未找到 .venv 解释器"
+    probe = (
+        "import sys, json; sys.path.insert(0, sys.argv[1]); "
+        "from pipeline.tts_client import TtsClient; "
+        "c = TtsClient('http://127.0.0.1:9002', timeout=15.0, retries=0); "
+        "h = c.health(); "
+        "print(json.dumps({'loaded': h.get('loaded', {}), 'engine': h.get('engine')}, ensure_ascii=False))"
+    )
+    try:
+        r = subprocess.run([str(vpy), "-c", probe, str(ROOT)],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=b1.SERVICE_PROBE_TIMEOUT_S)
+        lines = [ln for ln in (r.stdout or "").splitlines() if ln.strip()]
+        payload = json.loads(lines[-1]) if lines else {}
+    except Exception as exc:
+        return False, f"lazy-load 探测桥失败: {exc}"
+    loaded = payload.get("loaded", {})
+    if loaded.get("alt-tts-b"):
+        return False, f"alt-tts-b 已装载（loaded.alt-tts-b=true）——违反 cuda:1 显存互斥"
+    # 二次保险：扫描 e2e 日志是否出现 lazy load 关键词
+    log_path = ROOT / "tmp" / "e2e_smoke.log"
+    if log_path.is_file():
+        try:
+            log_text = log_path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            log_text = ""
+        for kw in ("alt-tts-b loaded", "lazy load", "loaded alt-tts-b"):
+            if kw.lower() in log_text.lower():
+                return False, f"e2e 日志扫描命中 lazy-load 关键词: {kw!r}（文件: {log_path}）"
+    return True, f"lazy-load 断言通过（loaded.alt-tts-b=false；e2e 日志无 lazy-load 关键词）"
+
+
 def check_b3_regression() -> tuple[bool, str]:
     """⑤ gate_b3 回归 = 等价覆盖（详见模块 docstring ⑤：整门重跑实测 3469s，
     超单项帽 1800s 近一倍，gate_b2 对 gate_b1 同一先例改显式复跑独有 eval 面）。"""
@@ -432,6 +477,8 @@ def main() -> int:
          check_m15),
         ("④ e2e 至少单语全过（bash scripts/e2e_smoke.sh --langs en，退出码即判定）",
          check_e2e),
+        ("⑦ M7 显存互斥硬断言（:9002 /health loaded.alt-tts-b=false + e2e 日志 lazy-load 关键词扫描）",
+         check_m7_lazy_load),
         ("⑤ gate_b3 回归（等价覆盖：B3 独有 eval 面 m8/m9/m11 显式复跑；映射见 docstring）",
          check_b3_regression),
         ("⑥ 中性名扫描（gate_b0 同源：台账附录A 强校验 + 公开文件零命中）",

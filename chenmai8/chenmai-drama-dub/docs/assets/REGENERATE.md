@@ -85,8 +85,22 @@ nohup bash ops/tunnel_gpu.sh keepalive >> tmp/tunnel_keepalive.log 2>&1 &      #
 
 ## 3. 模块重生成顺序（依赖图即拓扑序）
 
+### 素材入口（material_fetch）
+
+`pipeline/material_fetch.py` 是素材唯一入口。默认走真实素材 fetch；fetch 失败或无源时回退到 `_generate_synthetic()`（抽离自 `scripts/e2e_smoke.sh` 原内联 heredoc）。
+
+CLI：
+```bash
+python -m pipeline.material_fetch --help
+python -m pipeline.material_fetch --ep ep01 --source <path_or_url>
+python -m pipeline.material_fetch --ep ep01 --fetch-all
+python -m pipeline.material_fetch --ep ep01 --only-missing
+python -m pipeline.material_fetch --list [--ep ep01]
+python -m pipeline.material_fetch --ep ep01 --synthetic
 ```
-0 契约(pipeline/contracts.py)+原语+scaffold → 1 M1 → 2 M2 → 3 M3 → 4 M4(:9001 在线)
+
+```
+-1 素材(pipeline/material_fetch.py) → 0 契约(pipeline/contracts.py)+原语+scaffold → 1 M1 → 2 M2 → 3 M3 → 4 M4(:9001 在线)
 → 5 M5 → 6 M6(mock 全离线，可与 4/5 并行) → 7 M11 → 8 M8 → 9 M9 → 10 M7(:9002 在线)
 → 11 M10(:9003 在线) → 12 M15 → 13 M13 → 14 M14(队列编排) → 15 四道门(B0-B4) + e2e
 ```
@@ -95,6 +109,7 @@ nohup bash ops/tunnel_gpu.sh keepalive >> tmp/tunnel_keepalive.log 2>&1 &      #
 
 | 步 | 模块 | 验收命令 | 通过线（冻结） |
 |---|---|---|---|
+| -1 | 素材入口 | `python -m pipeline.material_fetch --help`；`python -m py_compile pipeline/material_fetch.py` | exit 0；py_compile 通过 |
 | 0 | 契约 | `python -m pipeline.cli validate <kind> <path>`；`pytest tests/test_contracts.py tests/test_b1_contract.py` | exit 0；38 passed |
 | 1 | M1 | `pytest tests/test_m1.py` | 7 passed；ffprobe 断言；时长差 ≤0.2s |
 | 2 | M2 | `bash scripts/eval_m2.sh` | 12 passed；CER ≤5%；起止误差 ≤0.3s 且 ≥90% 命中 |
@@ -136,6 +151,17 @@ python tests/check_e2e.py --ep e2e01 --langs en   # e2e 断言集（时长/字�
 > **DEMO GATE**：`tests/check_e2e.py` ⑧⑨ PASS 是全链成片演示的前置条件。
 > 若句窗超裁（⑧）或末句截断对齐（⑨）任一 FAIL，全链成片存在截断风险，
 > 建议演示字幕擦除/AI 标识对比片段。
+
+**演示前显存互斥核查项（SOP）**：
+1. 确认 `:9002 /health` 中 `loaded.alt-tts-b=false`（备选链未触发懒加载）。
+2. 若需启动 lip-pro，先停 :9002 服务或确认 alt-tts-b 权重目录不可达（`loaded.alt-tts-b=false`）。
+3. 禁止在 lip-fast / lip-pro 常驻期间向 :9002 发送 `engine=alt-tts-b` 请求（同卡 cuda:1 互斥，~8GB vs ~18GB）。
+4. 重跑 gate_b4 ⑦ 断言通过后，方可将全链成片投入演示。
+
+**演示日 checklist**：
+
+- [ ] queue 重放排期待 GPU 就绪（GPU 机 :9003 lip 服务健康 + 隧道通）
+- [ ] gate_b4 ⑦ 显存互斥断言 PASS（`loaded.alt-tts-b=false` + 日志无 lazy-load 关键词）
 
 ## 5. 替换/重生成模块时的回归清单
 

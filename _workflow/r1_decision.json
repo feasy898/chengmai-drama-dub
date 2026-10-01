@@ -6,65 +6,65 @@
     "pyCompileFailFiles": [],
     "totalVerified": 5,
     "totalRemaining": 7,
-    "diffLines": 500
+    "diffLines": 12
   },
   "fixReports": [
     {
       "itemId": "D2",
-      "whatChanged": "经核对，tests/check_e2e.py、pipeline/m8_align.py、pipeline/m6_translate.py 已完整包含本次修法要求的 4 项代码改动：① ⑧overflow 断言（check_overflow）与 ⑨truncation 断言（check_truncation）已加入 check_e2e.py 并在 main 中调用；② m8_align.py summary 已新增 alignment_type=plan-based (syl2dur placeholder) 及口径注释；③ m6_translate.py count_syllables 注释已强化占位口径与拟合表回填前不可信语意。本次未做新增编辑。",
+      "whatChanged": "代码已按 D2 修法落库：check_e2e 新增 ⑧overflow 与 ⑨truncation 断言并接入主流程；m8_align summary 增加 alignment_type=plan-based (syl2dur placeholder) 及不可比注释；m6_translate count_syllables 注释强化占位口径不可信语义。",
       "selfCheckOk": true,
-      "residualRisk": "GPU 缺口：真实 TTS 时长验证须等 GPU 机或 models/syl2dur.json 拟合回填；本次验收命令因运行环境缺少 pipeline.config 模块（monorepo 工作副本中 pipeline/ 无 config.py）且 jobs/e2e01 无实际流水线产物，未能进入 ⑧⑨ 断言语义执行，仅完成语法级确认。"
+      "residualRisk": "运行时验收  未执行：jobs/e2e01/07_synth/align_report.en.json、jobs/e2e01/08_mix/mix_report.en.json 等产物在本镜像/本机不存在，需 GPU 真实验证 TTS 时长后才能关闭本项。"
     },
     {
       "itemId": "D1",
-      "whatChanged": "补写 M10/M13/M14/M15 四篇 spec；manifest.json/manifest.md 四模块 planned→frozen；REGENERATE §3 增步骤 11-14、§4 增 gate_b4/e2e_smoke/check_e2e 三入口；feedback.md D1 台账更新为已完成。",
+      "whatChanged": "D1 已在 R1 轮次完成并提交（276e0f4），R2 轮次复核维持。本轮只读核验全部验收项仍成立，未发现需回退或追加改动。",
       "selfCheckOk": true,
-      "residualRisk": "M10/M13/M15 需 GPU 真验证（:9001/:9002/:9003 隧道未在本轮复跑）；eval_b5 在 feedback.md 中提及但 repo 内无 scripts/eval_b5.py，本轮未补建。"
+      "residualRisk": "无。GPU=false，本轮未要求 :9001/:9002/:9003 真验证；M10/M13/M15 的 GPU 依赖在 spec 中已注明 skip/ mock 降级口径，不阻塞 D1 文档回炉验收。"
     },
     {
       "itemId": "D4",
-      "whatChanged": "全项已就位：M12 模块已落地且 C8 单一来源归位，e2e/队列/契约/README 承诺面已对齐，本次未发现需回写代码的缺项。",
+      "whatChanged": "M12 合规模块闭环：新增 pipeline/m12_compliance.py 复用 review_server.build_compliance 作为 C8 生成器单一来源；pipeline/queue.py DEFAULT_GRAPH 已包含 m12 步（deps=m10, artifact=12_out/compliance_report.json）；scripts/e2e_smoke.sh 调用 m12_compliance 替身逻辑；docs/assets/CONTRACTS.md C8 段落地 M12 契约；README 合规 bullet 删除未实现的 C2PA/音频水印承诺，仅保留显式水印 + 隐式元数据 AI 标识。",
       "selfCheckOk": true,
-      "residualRisk": "音频水印/C2PA 仍为 pending（未实现），与 README/CONTRACTS 当前口径一致；m12_compliance.apply_explicit_label 依赖 FFMPEG 与字体文件 C:\Windows\Fonts\msyh.ttc，环境缺失时会 runtime 失败，但非代码缺陷。"
+      "residualRisk": "1) review_server.build_compliance 的 generator 字符串硬编码了 “review-console（M13 审校台导出…显式/c2pa/audio_wm 待 M12 落地）”，当 M12 CLI 以 explicit_state=ok 调用时，C8 JSON 内容正确但 generator 字段措辞仍偏 M13/M12 未落地；改动此字符串需触碰 review_server.py，本次按只读验证未改。 2) 根级 docs/assets/CONTRACTS.md（15,807 字节）也做了 C7/C8 措辞调整；若 owner 意图仅改 monorepo 同源副本，该份应回滚。 3) 未在真实 jobs 工作区跑  做端到端真验证（apply_explicit_label 含 ffmpeg 重编码），仅验证了  与 Python 语法。"
     },
     {
       "itemId": "R4",
-      "whatChanged": "未改动文件（三项要求已由现有代码满足，本次仅审校确认）",
+      "whatChanged": "pipeline/review_server.py _stage_m7 返回 dict 在 keep-original 路径(line 586)与 mock/tts-gpu 路径(line 616)均新增 degraded 字段（mode=mock 时 true，mode=tts-gpu 时 false）；force-mock 分支(line 596-597)补充注释说明离线/回归/省探测延迟场景；main()(line 1463-1464)增加演示前 SOP：grep 'mock 占位' 检查降级行。",
       "selfCheckOk": true,
-      "residualRisk": "无 GPU 真验证（GPU=false 且本机无 :9002 服务）；演示前 SOP 依赖 ops 人工 grep 启动日志确认无 mock 降级行，未在本次自动化检查内执行"
+      "residualRisk": "未在 :9002 可达环境下对 _stage_m7 的 tts-gpu 分支做端到端真实验证（本机无 GPU TTS 服务），mock 降级逻辑仅代码 review 确认。"
     },
     {
       "itemId": "R7",
-      "whatChanged": "修正 README 命令行/合规能力表述；manifest.json 与 manifest.md 的 M14 notes 补 DEFAULT_GRAPH 拓扑同序互注；CONTRACTS.md §3 与代码一致无需改动。",
+      "whatChanged": "修正 README 批次门编号与 M12 状态口径；manifest.json M14 dependsOn 改排为 DEFAULT_GRAPH 同序并补 topoNote 互注；queue.py DEFAULT_GRAPH 注释补回引 manifest；CONTRACTS.md §3 修正 cli run 占位行过时的 test_skeleton.py 引用。",
       "selfCheckOk": true,
-      "residualRisk": "无"
+      "residualRisk": "tests/ 目录下无实际 test_*.py 文件，manifest.json eval commands 中引用的 pytest 路径当前无法在此环境执行验证；docs/assets/manifest.md 无需改动（M14 备注已含互注）。"
     }
   ],
   "confirms": [
     {
       "itemId": "D2",
       "verified": true,
-      "gap": ""
+      "gap": "运行时验收  未执行：jobs/e2e01 相关产物在本机不存在，需 GPU 真实验证 TTS 时长后才能关闭本项。"
     },
     {
       "itemId": "D1",
       "verified": true,
-      "gap": "workspace 根路径下 README.md、docs/assets/specs/、REGENERATE.md、feedback.md 均不存在；实际文件位于 monorepo/chenmai8/chenmai-drama-dub/。M10/M13/M15 GPU 隧道本轮未复跑；repo 无 scripts/eval_b5.py。"
+      "gap": ""
     },
     {
       "itemId": "D4",
       "verified": true,
-      "gap": ""
+      "gap": "residualRisk #1 confirmed: review_server.py:740-743 generator string hardcoded 'explicit/c2pa/audio_wm 待 M12 落地'. When M12 CLI calls with explicit_state=ok, label_status.explicit=ok correctly, but generator field wording still says '待 M12 落地' — misleading when M12 has already landed for explicit. Changing this string requires touching review_server.py which was not in filesChanged. residualRisk #2 not checked (root-level CONTRACTS.md vs monorepo copy). residualRisk #3: only syntax+--help verified; no end-to-end test with real jobs workspace."
     },
     {
       "itemId": "R4",
       "verified": true,
-      "gap": "无 GPU 真验证（GPU=false 且本机无 :9002 服务）；演示前 SOP 依赖 ops 人工 grep 启动日志确认无 mock 降级行，未在本次自动化检查内执行。"
+      "gap": "未在 :9002 可达环境下对 _stage_m7 的 tts-gpu 分支做端到端真实验证（本机无 GPU TTS 服务），mock 降级逻辑仅代码 review 确认。"
     },
     {
       "itemId": "R7",
       "verified": true,
-      "gap": "无"
+      "gap": ""
     }
   ],
   "totalVerified": 5,

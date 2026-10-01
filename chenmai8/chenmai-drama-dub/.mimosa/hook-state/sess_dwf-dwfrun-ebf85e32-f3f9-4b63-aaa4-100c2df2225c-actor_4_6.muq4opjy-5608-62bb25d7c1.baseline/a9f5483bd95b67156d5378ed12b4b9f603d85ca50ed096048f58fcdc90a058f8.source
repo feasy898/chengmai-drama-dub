@@ -126,10 +126,149 @@ if [ "$FRESH" = 1 ]; then
   rm -f "$RAW_CLIP"
 fi
 if [ ! -f "$RAW_CLIP" ]; then
-  say "---- [material] 获取/生成素材 → $RAW_CLIP"
-  "$PY" -m pipeline.material_fetch --ep "$EP" --out "$RAW_CLIP" >> "$LOG" 2>&1
+  say "---- [material] 合成素材 → $RAW_CLIP"
+  "$PY" - "$EP" "$RAW_CLIP" >> "$LOG" 2>&1 <<'PYMAT'
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import cv2
+import numpy as np
+import soundfile as sf
+from PIL import Image, ImageDraw, ImageFont
+
+ep, clip_s = sys.argv[1], sys.argv[2]
+root = Path.cwd()
+clip = Path(clip_s)
+clip.parent.mkdir(parents=True, exist_ok=True)
+tmp = root / "tmp"
+tmp.mkdir(exist_ok=True)
+
+# 台词取自 mt_backends._MOCK_LEXICON 全覆盖句（ASR 实测可整句命中，见 jobs/ep01），
+# 保证 mock 翻译无未覆盖 Han 残段 → 目标语字幕零中文（check ③a 的前提）。
+SENTS = [  # (text, speaker, sapi_rate)
+    ("你到底想怎么样", "A", 0),
+    ("把话说清楚", "B", -2),
+    ("三年了", "A", -1),
+]
+FONT = Path(r"C:\Windows\Fonts\msyh.ttc")
+assert FONT.is_file(), f"缺中文字体: {FONT}"
+
+def trim_tail(data: np.ndarray, sr: int, thr: float = 0.004, margin_s: float = 0.06):
+    """掐头去尾静音（SAPI 慢速尾音会拖过 VAD，令 OCR/ASR 句窗失配——实测教训）。"""
+    x = np.asarray(data).squeeze()
+    nz = np.nonzero(np.abs(x) > thr)[0]
+    assert nz.size, "整段静音"
+    a = max(0, int(nz[0] - margin_s * sr))
+    b = min(len(x), int(nz[-1] + margin_s * sr))
+    return x[a:b]
+
+# ---- 1a) SAPI 合成 3 句 → 48k mono wav ----
+voices = subprocess.run(
+    ["powershell", "-NoProfile", "-Command",
+     "Add-Type -AssemblyName System.Speech;"
+     "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
+     "$s.GetInstalledVoices()|ForEach-Object{$_.VoiceInfo.Name+'|'+$_.VoiceInfo.Culture.Name}"],
+    capture_output=True, text=True, timeout=60).stdout
+zh_voice = next((ln.split("|")[0] for ln in voices.splitlines()
+                 if "|zh" in ln.lower()), None)
+assert zh_voice, f"本机无 zh SAPI 声库:\n{voices}"
+wavs = []
+for i, (text, spk, rate) in enumerate(SENTS):
+    raw = tmp / f"e2e_sapi_{i}.wav"
+    ok48 = tmp / f"e2e_sapi_{i}_48k.wav"
+    ps = ("$ErrorActionPreference='Stop';"
+          "Add-Type -AssemblyName System.Speech;"
+          "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
+          f"$s.SelectVoice('{zh_voice}');$s.Rate={rate};"
+          "$s.SetOutputToWaveFile('" + str(raw).replace('\\', '/') + "');"
+          f"$s.Speak('{text}');$s.Dispose()")
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True, timeout=120,
+                   capture_output=True, text=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw),
+                    "-ar", "48000", "-ac", "1", str(ok48)], check=True, timeout=120)
+    wavs.append((ok48, spk))
+
+# ---- 1b) 时间轴布局：首句 3.2s 起（片头 0-3s 留给显式标识），句间 1.0s，尾留 1.0s；
+#            字幕显示窗=修剪后语音窗（与 M2 OCR 行/M4 VAD 窗对齐，保证 OCR↔ASR 融合命中）----
+cursor, layout = 3.2, []
+for i, ((w, spk), (text, _, _)) in enumerate(zip(wavs, SENTS)):
+    data, _sr = sf.read(str(w), dtype="float32")
+    data = trim_tail(data, _sr)
+    trim_w = w.with_name(w.stem + "_trim.wav")
+    sf.write(str(trim_w), data, _sr, subtype="PCM_16")
+    wavs[i] = (trim_w, spk)
+    dur = len(data) / _sr
+    layout.append({"text": text, "speaker": spk, "start": round(cursor, 3),
+                   "end": round(cursor + dur, 3)})
+    cursor += dur + 1.0
+total = round(cursor + 1.0 - 1.0, 3)  # 末句后留 1.0s 静默（④c/⑥ 抽样锚点）
+n_frames = int(round(total * 25))
+
+# ---- 1c) 音轨：48k 立声摆放 ----
+sr = 48000
+track = np.zeros((int(round(total * sr)), 2), dtype=np.float32)
+for (w, _), item in zip(wavs, layout):
+    data, _sr = sf.read(str(w), dtype="float32")
+    data = np.asarray(data).squeeze()
+    i0 = int(item["start"] * sr)
+    seg = data[: max(0, len(track) - i0)] * 0.85
+    track[i0:i0 + len(seg), 0] += seg
+    track[i0:i0 + len(seg), 1] += seg
+peak = float(np.abs(track).max())
+if peak > 0.99:
+    track *= 0.99 / peak
+audio_wav = tmp / "e2e_audio_48k.wav"
+sf.write(str(audio_wav), track, sr, subtype="PCM_16")
+
+# ---- 1d) 视频：公有领域人像（fixtures，M5 同款真脸）铺满画幅 + 硬字幕 ----
+from pipeline.m1_ingest import FFMPEG  # noqa: E402
+
+portrait = Image.open(root / "tests" / "fixtures" / "portrait_pd.jpg").convert("RGB")
+scale = 1920 / portrait.height
+pw = int(portrait.width * scale)
+portrait = portrait.resize((pw, 1920), Image.LANCZOS)
+x0 = max(0, (pw - 1080) // 2)
+base_img = portrait.crop((x0, 0, x0 + 1080, 1920))
+
+font = ImageFont.truetype(str(FONT), 64)
+sub_imgs = {}
+for i, item in enumerate(layout):
+    img = base_img.copy()
+    d = ImageDraw.Draw(img)
+    bbox = d.textbbox((0, 0), item["text"], font=font, stroke_width=6)
+    tw = bbox[2] - bbox[0]
+    d.text(((1080 - tw) / 2 - bbox[0], 1560 - bbox[1]), item["text"],
+           font=font, fill=(255, 255, 255), stroke_width=6, stroke_fill=(0, 0, 0))
+    sub_imgs[i] = np.asarray(img)[:, :, ::-1].copy()  # RGB→BGR
+none_img = np.asarray(base_img)[:, :, ::-1].copy()
+
+video_only = tmp / "e2e_video.mp4"
+vw = cv2.VideoWriter(str(video_only), cv2.VideoWriter_fourcc(*"mp4v"), 25, (1080, 1920))
+assert vw.isOpened(), "cv2.VideoWriter 打开失败（mp4v 后端缺失？）"
+for f in range(n_frames):
+    t = f / 25.0
+    state = none_img
+    for i, item in enumerate(layout):
+        if item["start"] - 0.02 <= t <= item["end"] + 0.02:
+            state = sub_imgs[i]
+    vw.write(state)
+vw.release()
+
+subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-i", str(video_only),
+                "-i", str(audio_wav), "-c:v", "libx264", "-preset", "fast",
+                "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
+                "-shortest", str(clip)], check=True, timeout=600)
+video_only.unlink(missing_ok=True)
+(tmp / "e2e_material.json").write_text(json.dumps(
+    {"ep": ep, "clip": str(clip), "duration_s": total, "fps": 25,
+     "n_frames": n_frames, "sentences": layout}, ensure_ascii=False, indent=2),
+    encoding="utf-8")
+print(f"OK material {clip} dur={total}s frames={n_frames}")
+PYMAT
   check_rc "material" $?
-  say "素材布局: $(head -c 400 tmp/e2e_material.json 2>/dev/null | tr -d '\n' || echo N/A)"
+  say "素材布局: $(head -c 400 tmp/e2e_material.json | tr -d '\n')"
 fi
 
 # ---------------------------------------------------------------------------

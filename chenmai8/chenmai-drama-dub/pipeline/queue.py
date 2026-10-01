@@ -128,6 +128,7 @@ SERVICE_DEPS: dict[str, tuple[str, ...]] = {
 #: 生产默认步骤图（与 scripts/e2e_smoke.sh 的链路同序；m12/M12 模块与
 #: m13/M13 审校台落地后按"只增"补入本表）：
 #:   共享(ep): m1 → m3 → m4 → m2 → m5；逐语种: m6 → m8 → m7 / m11 → m9 → m10 → m12 → m15
+#: 同序校验点：scripts/e2e_smoke.sh 头部链路顺序与本图互锚；任一方改序须同步另一方。
 #: m4 的 CLI 暂无 ``--jobs-dir``（T5 骨架形态），自定 jobs_dir 时用 --graph 覆盖该步。
 #:
 #: 本图依赖序 = M14 dependsOn 同序校验的唯一来源；

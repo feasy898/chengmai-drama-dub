@@ -98,7 +98,24 @@ bash scripts/eval_m7.sh    # = pytest tests/test_m7_tts.py -v
 
 ## 6. 重生成注意事项
 
-- 显存互斥：alt-tts-b（cuda:1 ~8GB）与 lip-pro（cuda:1 ~18GB）不可同时驻留——lip-pro 起来前先停本服务备选链。
+### 6.1 显存互斥与禁触条件
+
+**同卡互斥矩阵（cuda:1，单卡 32GB）**：
+
+| 驻留者 | 显存占用 | 互斥对象 | 动作 |
+|---|---|---|---|
+| lip-fast（常驻） | ~18GB | alt-tts-b 懒加载 | 不可同时存在 |
+| lip-pro（planned） | ~18GB | alt-tts-b 懒加载 | lip-pro 启动前必须先停 :9002 备选链懒加载 |
+| alt-tts-b（懒加载） | ~8GB | lip-fast / lip-pro | 首次命中时才装载；若 cuda:1 已被占，装载失败 → OOM / RuntimeError |
+
+**禁触条件**：
+- `gpu-services/tts/service.py` 启动时只常驻 dub-tts（cuda:0 fp32 ~7GB）；alt-tts-b 不预装。
+- 当 lip-fast 已启动（`run_gpu.sh start` 完成）后，**禁止**手动触发 alt-tts-b 懒加载（如发 `engine=alt-tts-b` 请求）。
+- 当需要启动 lip-pro 时，必须先停止 :9002 服务或确认 alt-tts-b 未装载（`/health` 返回 `loaded.alt-tts-b=false`）。
+- e2e / gate_b4 只走 dub-tts 主力常驻（cuda:0），不触发备选引擎懒加载；若日志出现 `alt-tts-b loaded` 或 `lazy load` 相关关键词，视为门禁 FAIL。
+
+### 6.2 双参考实测样例
+
 - 双参考实测样例（T12 冒烟记录）：SAPI zh 中性句 voice_ref(7.2s) + SAPI zh 质问句 emo_ref(6.0s) →
   合成英文句 → wav 3.553s/22050Hz，emo_ref_used=true。
 - emo_ref 缺省时 voice-only 合成合法（emo_ref_used=false）；emo_ref 提供但引擎不支持时文件仍被校验，
