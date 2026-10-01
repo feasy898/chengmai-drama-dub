@@ -51,7 +51,7 @@
 |---|---|---|
 | `market` | str | 目标市场（取自 channels config） |
 | `ep` | str | 集 ID |
-| `findings` | list[Finding] | 规则引擎发现（M12 接入前为空） |
+| `findings` | list[Finding] | M12 规则引擎发现（当前版本接入前为空） |
 | `label_status` | LabelStatus | 四项标识落实状态 |
 | `human_review` | list[str] | 已审校 utt_id 清单 |
 | `generator` | str | 生成器署名 |

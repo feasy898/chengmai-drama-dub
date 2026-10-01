@@ -1,0 +1,62 @@
+{
+  "round": 2,
+  "gate": {
+    "pyCompilePass": 14,
+    "pyCompileFail": 0,
+    "pyCompileFailFiles": [],
+    "totalVerified": 9,
+    "totalRemaining": 3,
+    "diffLines": 77
+  },
+  "fixReports": [
+    {
+      "itemId": "R6",
+      "whatChanged": "cmd_run 入口增加演示风险 stderr 打印；run 子命令 epilog 增加演示风险语注；Queue.run docstring 补充生产/演示推荐路径与未端到端验证说明。",
+      "selfCheckOk": true,
+      "residualRisk": "无。"
+    },
+    {
+      "itemId": "R1",
+      "whatChanged": "docs/assets/REGENERATE.md §6 拆分为隧道节(§6.1)与网络镜像节(§6.2)，补充 keepalive/60s 重试窗/录屏兜底 SOP；scripts/e2e_smoke.sh 头部注释补充 tunnel_gpu.sh 版本化管理与 ensure_tunnel 调用语义。",
+      "selfCheckOk": false,
+      "residualRisk": "specs/gpu-tunnel.md 文件在 monorepo 中不存在；REGENERATE.md §6.1 引用了该文档。该引用在原 §2.3 已存在，非本次新增。"
+    },
+    {
+      "itemId": "R3",
+      "whatChanged": "tests/check_e2e.py 的 check_overflow 失败时打印红色 DEMO GATE 警告；docs/assets/REGENERATE.md 演示日 gate 节增补 check_e2e.py ⑧⑨ PASS 是全链成片演示的前置条件。",
+      "selfCheckOk": true,
+      "residualRisk": "e2e01 工作区不存在且 pipeline/config.py 缺失，无法运行 python tests/check_e2e.py --ep e2e01 --langs en 做完整集成验证；警告代码路径已通过隔离函数测试验证。GPU: false。"
+    },
+    {
+      "itemId": "R5",
+      "whatChanged": "compute_metrics 返回的 summary 新增 demo_recommended 列表（自动排除 method 含 placeholder 的指标 + 硬纳入 lip_score/cost_per_minute）；review_server 新增 GET /api/tasks/{task_id}/metrics 端点优先展示 demo_recommended 节。",
+      "selfCheckOk": true,
+      "residualRisk": "1) 三个 placeholder 指标（speaker_similarity=1.0 / emotion_similarity=1.0 / listen_wer=0.0）仍是硬编码假值，demo_recommended 仅展示层隐藏，未消除底层数据失真；2) CLI 验收（python -m pipeline.m15_metrics --ep ep01 --lang en）未实际执行——当前 workspace 无完整上游产物（M8/M9/M10 报告 + M14 metrics.db），命令会因 MetricsError 提前失败，无法端到端验证输出；3) 前端 review_server 页面代码未同步新增 demo_recommended 可视化面板，API 已就绪但 UI 不会自动展示，需后续前端改动补齐。"
+    }
+  ],
+  "confirms": [
+    {
+      "itemId": "R6",
+      "verified": true,
+      "gap": "无"
+    },
+    {
+      "itemId": "R1",
+      "verified": true,
+      "gap": "specs/gpu-tunnel.md 在 monorepo 中缺失；REGENERATE.md §6.1 引用该文档，但该引用非本次新增（原 §2.3 已存在）。"
+    },
+    {
+      "itemId": "R3",
+      "verified": true,
+      "gap": "e2e01 工作区不存在且 pipeline/config.py 缺失，无法运行 python tests/check_e2e.py --ep e2e01 --langs en 做完整集成验证；警告代码路径已通过代码审查 + py_compile 验证。"
+    },
+    {
+      "itemId": "R5",
+      "verified": true,
+      "gap": "placeholder 硬编码假值未消除；CLI 端到端未执行；前端页面未新增 demo_recommended 可视化面板。"
+    }
+  ],
+  "totalVerified": 9,
+  "totalItems": 12,
+  "maxRounds": 4
+}

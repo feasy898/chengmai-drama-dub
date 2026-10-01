@@ -129,10 +129,6 @@ SERVICE_DEPS: dict[str, tuple[str, ...]] = {
 #: m13/M13 审校台落地后按"只增"补入本表）：
 #:   共享(ep): m1 → m3 → m4 → m2 → m5；逐语种: m6 → m8 → m7 / m11 → m9 → m10 → m12 → m15
 #: m4 的 CLI 暂无 ``--jobs-dir``（T5 骨架形态），自定 jobs_dir 时用 --graph 覆盖该步。
-#:
-#: 本图依赖序 = M14 dependsOn 同序校验的唯一来源；
-#: docs/assets/manifest.json M14-queue.dependsOn 与 docs/assets/manifest.md M14 备注
-#: 均锚定本图顺序（m10-m15 段: m10>m12>m15）；改图必同步两文件。
 DEFAULT_GRAPH: dict[str, StepSpec] = {
     "m1": StepSpec(
         "m1",
