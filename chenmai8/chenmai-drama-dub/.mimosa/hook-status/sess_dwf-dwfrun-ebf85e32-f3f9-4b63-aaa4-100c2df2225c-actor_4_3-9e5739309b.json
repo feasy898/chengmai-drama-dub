@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-10-01T21:37:02.228Z",
+  "sessionId": "sess_dwf-dwfrun-ebf85e32-f3f9-4b63-aaa4-100c2df2225c-actor_4_3",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "README.md",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 29,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

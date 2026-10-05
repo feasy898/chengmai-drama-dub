@@ -1,0 +1,291 @@
+{
+  "items": [
+    {
+      "itemId": "D1",
+      "title": "资产包回炉：M10/M12/M13/M14/M15 零 spec 且 manifest 反向失实",
+      "currentState": "docs/assets/specs/ 仅 9 篇覆盖 M1-M3/M5-M9/M11；M10/M12/M13/M14/M15 无 spec。manifest.json 仍标 planned 且 blocker 失实（与 pipeline/cli.py:6 的 M14 队列实现矛盾）。REGENERATE §3 顺序表止于 M7、§4 门清单止于 gate_b3。",
+      "proposedFix": "①补 m10-lipsync/m13-review/m14-queue/m15-metrics 四篇 spec（双轮盲重生成）；②manifest.json/manifest.md 四模块 planned→frozen；③REGENERATE §3 增步骤 11-14、§4 增 gate_b4/eval_b5/e2e_smoke/check_e2e 三入口。",
+      "acceptance": "四 spec 入库 + manifest 状态翻转 + REGENERATE 步骤/门入口增补，commit 合入时 feedback 台账销项。",
+      "gpuRequired": false,
+      "sourceBlocked": false,
+      "priority": "high",
+      "files": [
+        "docs/assets/specs/",
+        "docs/assets/manifest.json",
+        "docs/assets/manifest.md",
+        "docs/assets/REGENERATE.md",
+        "pipeline/queue.py",
+        "pipeline/m10_lipsync.py",
+        "pipeline/review_server.py"
+      ]
+    },
+    {
+      "itemId": "D2",
+      "title": "核心卖点在真实 TTS 下不成立：3/3 句超窗截断 + 对齐率口径分裂",
+      "currentState": "e2e01 三句合成时长全部超预算窗（2.961/2.995/1.474s vs window 上限 1.98/1.76/0.88s）；M9 按句窗硬裁切（mix_report.en.json overflow=3）；M15 duration_alignment_rate=0.0 而 M8 align_report 自评 alignment_rate=1.0；tests/check_e2e.py ⑦ 只验句窗非静音不验超窗。",
+      "proposedFix": "①TTS 侧时长控制闭环（超预算强制换短译法，或放宽 atempo 后处理窗口——现状 [0.9,1.1] 救不了 65-100% 超窗）；②tests/check_e2e.py ⑦ 增超窗/截断断言；③M8 align_report alignment_rate 改用实测落窗口径（消除 1.0 vs 0.0 双轨）。",
+      "acceptance": "修复批 commit 销项；任一演示日前强制确认 D2 状态；metrics.json 与 align_report 主口径一致。",
+      "gpuRequired": true,
+      "sourceBlocked": false,
+      "priority": "high",
+      "files": [
+        "jobs/e2e01/12_out/metrics.json",
+        "jobs/e2e01/08_mix/mix_report.en.json",
+        "jobs/e2e01/07_synth/align_report.en.json",
+        "pipeline/m9_mix.py",
+        "tests/check_e2e.py",
+        "pipeline/m8_align.py",
+        "pipeline/m6_translate.py"
+      ]
+    },
+    {
+      "itemId": "D3",
+      "title": "演示母盘缺失：无任何真实短剧全链交付物，ep01 为半成品",
+      "currentState": "clips/ 仅 e2e01_raw.mp4（595KB）；jobs/ep01/ 为半成品（00_raw/06_mt/12_out 空，残留 01_media/04_dial）。真实素材未到位，三语全链依赖 :9001/:9002/:9003 隧道与 GPU 机常驻服务。",
+      "proposedFix": "真实竖屏短剧素材到位后 material_fetch.py --fetch-all --only-missing 续跑；损坏件换源并 verify PASS；ep01 清理待 owner 确认后执行。",
+      "acceptance": "真实素材 en/es/ar 三语全链跑通并保留 12_out 成片与 metrics.json 作母盘；ep01 清理获 owner 批复。",
+      "gpuRequired": true,
+      "sourceBlocked": false,
+      "priority": "high",
+      "files": [
+        "clips/",
+        "jobs/ep01/",
+        "pipeline/material_fetch.py"
+      ]
+    },
+    {
+      "itemId": "D4",
+      "title": "M12 合规模块缺位：显式标识只是 e2e 脚本内替身，水印/C2PA 未实现",
+      "currentState": "显式 AI 标识是 scripts/e2e_smoke.sh 内 PIL 渲染 PNG+overlay 替身（三处自述）；音频水印/C2PA 完全未实现；C8 label_status 四项全 pending；README 承诺只有一半落地。review_server.py build_compliance 已存在可复用。",
+      "proposedFix": "①e2e 内显式标识逻辑上移进 pipeline/m12 骨架模块；②review_server.build_compliance 复用为 M12 C8 生成器单一来源；③音频水印/C2PA 落 m12 占位+reason；④queue.DEFAULT_GRAPH 增 m12 步。",
+      "acceptance": "M12 最小闭环 commit 销项；C8 生成器单一来源；README/CONTRACTS 承诺面归位。",
+      "gpuRequired": false,
+      "sourceBlocked": false,
+      "priority": "medium",
+      "files": [
+        "scripts/e2e_smoke.sh",
+        "pipeline/review_server.py",
+        "pipeline/queue.py",
+        "docs/assets/CONTRACTS.md"
+      ]
+    },
+    {
+      "itemId": "D5",
+      "title": "M14 队列零生产使用 + m10 artifact 申报错位",
+      "currentState": "jobs.db/metrics.db 0 行；真实 e2e 是 bash 手写顺序驱动不经 queue。queue.py:200 m10 步 artifact='09_lip/lip_plan.{lang}.jsonl' 而 m10_lipsync.py:747 实际产物='09_lip/done/{ep}.{lang}.lip.mp4'；resume 按计划文件判跳过，误删成片不触发重跑。",
+      "proposedFix": "①用 queue 重放一次 e2e01 全链让 jobs.db/metrics.db 落真实行；②m10 步 artifact 补 done 视频槽位（申报=交付物）；③e2e_smoke.sh 与 queue.DEFAULT_GRAPH 两处头部互注「同序校验点」。",
+      "acceptance": "queue 重放跑完 jobs.db/metrics.db 有真实行且 m10 artifact 申报与交付物一致；commit 销项。",
+      "gpuRequired": true,
+      "sourceBlocked": false,
+      "priority": "medium",
+      "files": [
+        "pipeline/queue.py",
+        "pipeline/m10_lipsync.py",
+        "scripts/e2e_smoke.sh",
+        "jobs/jobs.db"
+      ]
+    },
+    {
+      "itemId": "R1",
+      "title": "隧道脆弱是常态：:9001/:9004 周期 reset 导致全链瘫换",
+      "currentState": "评审当日 :9001/:9004 down；REGENERATE §6.1 自认公网链路周期 reset；:9001 一断，e2e/gate_b4/审校台在线重生成全瘫。",
+      "proposedFix": "演示日 T-1 提前 keepalive + 完整预跑一遍 e2e；准备离线演示录屏兜底（录屏须避开 R3 截断片段）。",
+      "acceptance": "演示日 T-1 连通性验证 PASS 且录屏就位。",
+      "gpuRequired": false,
+      "sourceBlocked": false,
+      "priority": "medium",
+      "files": [
+        "docs/assets/REGENERATE.md",
+        "ops/tunnel_gpu.sh",
+        "scripts/e2e_smoke.sh"
+      ]
+    },
+    {
+      "itemId": "R2",
+      "title": "显存互斥：alt-tts-b 与 lip-pro 同卡互斥，误触发懒加载 OOM",
+      "currentState": "alt-tts-b 落 cuda:1（~8GB）与 lip-pro（~18GB）互斥；误触发 :9002 备选链懒加载会 OOM 拖垮两条服务（gate_b4 docstring 环境注记 4 已登记）。",
+      "proposedFix": "演示机严禁触发 :9002 备选引擎懒加载；只走常驻 dub-tts 路径。",
+      "acceptance": "演示前确认 :9002 服务状态且无懒加载日志。",
+      "gpuRequired": true,
+      "sourceBlocked": false,
+      "priority": "medium",
+      "files": [
+        "docs/assets/REGENERATE.md",
+        "docs/assets/specs/m7-tts.md",
+        "scripts/gate_b4.py"
+      ]
+    },
+    {
+      "itemId": "R3",
+      "title": "播放全链成片暴露截断（与 D2 联动，即日生效）",
+      "currentState": "overflow 3/3 + duration_alignment_rate=0.0；评委拿到 metrics.json 或听出截断即反噬。",
+      "proposedFix": "D2 修复前禁播全链成片；只播字幕擦除对比、AI 标识对比等无配音时长承诺的片段。",
+      "acceptance": "D2 修复批 commit 前无全链成片演示。",
+      "gpuRequired": false,
+      "sourceBlocked": false,
+      "priority": "high",
+      "files": [
+        "jobs/e2e01/12_out/metrics.json",
+        "pipeline/m9_mix.py"
+      ]
+    },
+    {
+      "itemId": "R4",
+      "title": "审校台静默降级 mock：:9002 断时单句重生成落占位音频",
+      "currentState": ":9002 断时 review_server.py:574 起 _stage_m7 落 mock 占位音频（reason 注明但界面不显眼）。",
+      "proposedFix": "演示前确认隧道；或显式 force-mock 并口头声明。",
+      "acceptance": "演示前 review_server 日志无 mock 降级（或已声明）。",
+      "gpuRequired": false,
+      "sourceBlocked": false,
+      "priority": "medium",
+      "files": [
+        "pipeline/review_server.py"
+      ]
+    },
+    {
+      "itemId": "R5",
+      "title": "M15 指标自证软肋：emotion_similarity=1.0 / listen_wer=0.0 / 无阈值线",
+      "currentState": "emotion_similarity=1.0（同一判别组件回判）、listen_wer=0.0（引擎自转写）、lip_score/cost_per_minute 无阈值线（baseline v0）。",
+      "proposedFix": "演示主打客观可验证项——非口型帧逐字节不变、擦字幕后中文 OCR 命中=0、成片时长差 0.0000、229 测试/五道门/契约样本 10/10；被追问 M15 时如实说明 method 口径。",
+      "acceptance": "演示材料不依赖 M15 自证指标；method 字段口头说明。",
+      "gpuRequired": false,
+      "sourceBlocked": false,
+      "priority": "medium",
+      "files": [
+        "jobs/e2e01/12_out/metrics.json",
+        "pipeline/review_server.py"
+      ]
+    },
+    {
+      "itemId": "R6",
+      "title": "queue 现场演示风险：python -m pipeline.cli run 从未在真实工作区跑过",
+      "currentState": "jobs.db 0 行；python -m pipeline.cli run 从未在真实工作区跑过（本次实查佐证）。",
+      "proposedFix": "现场演示走已验证 e2e 路径，不现写 queue 命令；queue 真实验证按 D5 排期。",
+      "acceptance": "演示无 queue 命令；D5 重放排期入账。",
+      "gpuRequired": false,
+      "sourceBlocked": false,
+      "priority": "medium",
+      "files": [
+        "pipeline/cli.py",
+        "pipeline/queue.py",
+        "jobs/jobs.db"
+      ]
+    },
+    {
+      "itemId": "R7",
+      "title": "文档现场被翻：README 不存在的目录、manifest 与代码矛盾",
+      "currentState": "README 不存在的目录、manifest『cli run 占位』与 pipeline/cli.py M14 实现矛盾——当场修 README×2/manifest.json×4/CONTRACTS §3#4；剩余漂移面（specs 缺四篇等）随 D1 回炉。",
+      "proposedFix": "剩余漂移面随 D1 回炉销项；演示前 README/CONTRACTS/manifest 三方对照刷新。",
+      "acceptance": "D1 回炉批 commit 合入时 specs 覆盖 M10/M12/M13/M14/M15，文档再无矛盾。",
+      "gpuRequired": false,
+      "sourceBlocked": false,
+      "priority": "low",
+      "files": [
+        "README.md",
+        "docs/assets/manifest.json",
+        "docs/assets/CONTRACTS.md",
+        "docs/assets/manifest.md"
+      ]
+    }
+  ],
+  "docs": [
+    {
+      "path": "monorepo/chenmai8/TASK.md",
+      "summary": "五条子线（C1-C5）+ 支撑层任务卡 v1.1，规定 C5 D1-D2 验收标准与红线（时长对齐修复前禁播全链成片）。",
+      "redlines": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "R3",
+        "R6"
+      ]
+    },
+    {
+      "path": "monorepo/chenmai8/chenmai-drama-dub/docs/assets/feedback.md",
+      "summary": "C5 只读评审反馈处置台账（2026-09-30）：5 topDebts + 7 demoRisks 全部成立，逐条登记修/缓/驳与当场修记录。",
+      "redlines": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7"
+      ]
+    },
+    {
+      "path": "monorepo/chenmai8/chenmai-drama-dub/docs/assets/REGENERATE.md",
+      "summary": "整仓再生手册：双机环境重建、模块依赖拓扑序、三道门验收命令、6.1 网络镜像坑与已知坑清单（含 atempo/中性名/首载超时）。",
+      "redlines": [
+        "R1",
+        "R2"
+      ]
+    },
+    {
+      "path": "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m6-translate.md",
+      "summary": "M6 整集上下文翻译 spec：三后端抽象（local/api/mock）、音节占位估长、in-budget-first 排序、C4 复合键 upsert。",
+      "redlines": [
+        "D2"
+      ]
+    },
+    {
+      "path": "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m7-tts.md",
+      "summary": "M7 情绪迁移合成 spec：双参考接口冻结、引擎链路由与降级、dub-tts fp32 定案、显存互斥与 alt-tts-b cuda:1 落位。",
+      "redlines": [
+        "R2"
+      ]
+    },
+    {
+      "path": "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m8-align.md",
+      "summary": "M8 时长对齐 spec：五级阶梯（占位→二分→换译→atempo 收口→keep-original）、C5 多语种分文件、对齐率冻结线 ≥0.70。",
+      "redlines": [
+        "D2"
+      ]
+    },
+    {
+      "path": "monorepo/chenmai8/chenmai-drama-dub/README.md",
+      "summary": "短剧出海本地化引擎 README：核心能力概述、仓库结构、冻结契约 C1-C8、命令行入口 M14 队列实现、当前状态与已知限制。",
+      "redlines": [
+        "D1",
+        "D4",
+        "R7"
+      ]
+    }
+  ],
+  "availableFiles": [
+    "monorepo/chenmai8/TASK.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/feedback.md",
+    "monorepo/chenmai8/chenmai-drama-dub/README.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/REGENERATE.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m1-ingest.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m2-ocr.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m3-separate.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m5-diar.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m6-translate.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m7-tts.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m8-align.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m9-mix.md",
+    "monorepo/chenmai8/chenmai-drama-dub/docs/assets/specs/m11-subs.md",
+    "monorepo/chenmai8/chenmai-drama-dub/pipeline/contracts.py",
+    "monorepo/chenmai8/chenmai-drama-dub/pipeline/m6_translate.py",
+    "monorepo/chenmai8/chenmai-drama-dub/pipeline/m7_tts.py",
+    "monorepo/chenmai8/chenmai-drama-dub/pipeline/m8_align.py",
+    "monorepo/chenmai8/chenmai-drama-dub/pipeline/queue.py"
+  ],
+  "missingSourceFiles": [],
+  "missingDocFiles": [
+    "monorepo/chenmai8/REGENERATE.md"
+  ],
+  "observations": [
+    "D2 根因链：M6 音节占位模型 + M8 atempo 收口窗 [0.9,1.1] 无法救援 65-100% 超窗，且 M8 align_report 路径口径 1.0 与 M15 实测 0.0 双轨并存。",
+    "D5 artifact 错位致 M14 生产验证缺失：queue.py m10 artifact 申报 lip_plan jsonl 但 m10_lipsync.py 实际交付 lip.mp4，resume 按计划文件判跳过，误删成片不触发重跑。",
+    "M7 执行 M8 atemo 决策但 duration_factor 二分基于 M6 占位估长，在未回填 models/syl2dur.json 前真实 TTS 时长预测不可靠。"
+  ]
+}
