@@ -68,7 +68,11 @@
 | 项 | 内容 | 状态 |
 |---|---|---|
 | 前处理依赖 | python3.12 + numpy + Pillow + ffmpeg：GPU 机 ffmpeg 8.0.1 在位、python3.12.13 在位（本轮实测） | ✅ 满足 |
+<<<<<<< 0b1f714740550a93975cfd27e8ea6fb6b1e7f6a0
 | VLM 依赖 | Higress 100.64.0.6:8080 可达但 `/v1/chat/completions` 401（本轮实测），GPU 机无 bao/vault CLI、无 .env、环境变量零凭证（本轮实测） | ⛔ **阻塞：待 owner/值班 L3 供给短时凭证** |
+=======
+| VLM 依赖 | Higress 100.100.0.6:8080 可达但 `/v1/chat/completions` 401（本轮实测），GPU 机无 bao/vault CLI、无 .env、环境变量零凭证（本轮实测） | ⛔ **阻塞：待 owner/值班 L3 供给短时凭证** |
+>>>>>>> 95db7f019843e6c4f7aebc6cdd8164da6ad80058
 | 模型配额 | 项目合计 ≤10 次（两 worker 共用）；P1 每集 1-2 次批量读图可守约 | 纪律内可行 |
 | 算力 | 前处理纯 CPU：didaozhan_p1 全片（1541.8s）两遍解码实测可行（见 proto 运行记录） | ✅ |
 | 契约 | 零契约改动：语义层走旁路 JSON，`ShotSheet` 校验只用其只读约束 | ✅ 无契约风险 |

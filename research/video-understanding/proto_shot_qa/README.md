@@ -27,7 +27,11 @@ P=/opt/gpumachine/projects/chenmai8/短剧多国出海
   -o results/e2e01 --ep e2e01 --baseline $P/jobs/e2e01/02_shots/shots.json
 
 # VLM 腿（凭证到位后；缺失则 exit 3 BLOCKED——不伪造结果）
+<<<<<<< 0b1f714740550a93975cfd27e8ea6fb6b1e7f6a0
 OPENAI_BASE_URL=http://100.64.0.6:8080/v1 OPENAI_API_KEY=<经bao注入> \
+=======
+OPENAI_BASE_URL=http://100.100.0.6:8080/v1 OPENAI_API_KEY=<经bao注入> \
+>>>>>>> 95db7f019843e6c4f7aebc6cdd8164da6ad80058
   VLM_MODEL=<模型名> .venv/bin/python shot_qa.py <video> -o results/x --vlm
 ```
 

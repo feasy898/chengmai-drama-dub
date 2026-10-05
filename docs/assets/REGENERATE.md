@@ -50,7 +50,11 @@ python -m venv .venv
 ### 2.2 部署步骤（全部幂等，可重跑）
 
 ```bash
+<<<<<<< 0b1f714740550a93975cfd27e8ea6fb6b1e7f6a0
 ssh root@100.64.0.7
+=======
+ssh root@100.100.0.7
+>>>>>>> 95db7f019843e6c4f7aebc6cdd8164da6ad80058
 # ① 主 venv（torch cu118 + transformers 4.52.x + fastapi/uvicorn/httpx）
 nohup bash gpu/setup_gpu.sh > /data/xdng/setup_gpu.log 2>&1 &
 # ② asr 独立 venv（读 /data/xdng/etc/model_ids.env 的模型 ID；该文件留 GPU 机不入公开仓，

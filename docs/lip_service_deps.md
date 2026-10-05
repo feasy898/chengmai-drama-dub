@@ -56,7 +56,11 @@ setup_lip_service.sh 第 4.5 节核验编码器在位）。
 
 ## 5. T16 部署与自验收实录（2026-09-29）
 
+<<<<<<< 0b1f714740550a93975cfd27e8ea6fb6b1e7f6a0
 - ssh 命令：`ssh dev-env-with-gpu`（公网宿主，36.139.118.235）；
+=======
+- ssh 命令：`ssh dev-env-with-gpu`（公网宿主，203.0.113.41）；
+>>>>>>> 95db7f019843e6c4f7aebc6cdd8164da6ad80058
   部署：`scp gpu-services/lip/{service.py,run_gpu.sh} dev-env-with-gpu:/data/xdng/services/lip/`
   + `scp gpu/setup_lip_service.sh dev-env-with-gpu:/data/xdng/`；
   核验：`bash /data/xdng/setup_lip_service.sh`（全 OK）；启动：

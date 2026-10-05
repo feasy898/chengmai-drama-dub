@@ -1,7 +1,11 @@
 {
  "task": "T5 M4 ASR/对齐/情绪 GPU 服务化部署报告",
  "generated_at": "2026-09-28T22:05:00+08:00",
+<<<<<<< 0b1f714740550a93975cfd27e8ea6fb6b1e7f6a0
  "machine": "anolis-gpu-01 (dev-env-with-gpu / 36.139.118.235), 2x Tesla V100S-PCIE-32GB (sm_70)",
+=======
+ "machine": "anolis-gpu-01 (dev-env-with-gpu / 203.0.113.41), 2x Tesla V100S-PCIE-32GB (sm_70)",
+>>>>>>> 95db7f019843e6c4f7aebc6cdd8164da6ad80058
  "service": {
   "name": "asr_align",
   "port": 9001,
