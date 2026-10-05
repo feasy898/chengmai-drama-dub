@@ -129,11 +129,12 @@ def _cli(tmp: Path, *args: str, check: bool = False) -> subprocess.CompletedProc
 def test_default_graph_structure_and_service_deps():
     g = default_graph()
     assert set(g) == {"m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8",
-                      "m9", "m10", "m11", "m15"}
+                      "m9", "m10", "m11", "m12", "m15"}
     order = [s.id for s in subgraph(g, "m15")]
     assert order.index("m4") < order.index("m2") < order.index("m5") < \
         order.index("m6") < order.index("m8") < order.index("m7") < \
-        order.index("m9") < order.index("m10") < order.index("m15")
+        order.index("m9") < order.index("m10") < order.index("m12") < \
+        order.index("m15")
     # 服务依赖声明：与各 StepSpec.services 同源一致（M13 复用的导入面）
     assert SERVICE_DEPS == {
         "m4": ("asr-align@9001",), "m6": ("mt@9004",),
@@ -307,7 +308,8 @@ def test_kill_midstep_then_resume_from_breakpoint(tmp_path):
          "--jobs-dir", str(tmp_path / "jobs"), "--db", str(tmp_path / "jobs.db"),
          "--metrics-db", str(tmp_path / "metrics.db"), "--graph", str(graph)],
         cwd=str(REPO_ROOT), env=env, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+        start_new_session=True)  # Linux: 独立进程组，否则下方 killpg 会连测试运行器一起杀
     deadline = time.time() + 30
     while time.time() < deadline and _counter(tmp_path, 3) == 0:
         assert proc.poll() is None, "resume 进程提前退出（未到 s3）"

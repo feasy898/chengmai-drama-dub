@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--langs", default="en", help="目标语种，逗号分隔")
     p_run.add_argument("--to", default="m15",
                        help="终止模块（默认 m15=当前默认图全链；"
-                            "规划示例 --to m12 待 M12 模块入库后可用）")
+                            "规划示例 --to m12 已可用）")
     p_run.add_argument("--input", default="", help="原始素材路径（m1 的 --in）")
     p_run.add_argument("--param", action="append", default=[],
                        metavar="K=V", help="附加步骤参数（可重复）")

@@ -200,11 +200,17 @@ DEFAULT_GRAPH: dict[str, StepSpec] = {
         deps=("m9",), artifact="09_lip/lip_plan.{lang}.jsonl",
         services=SERVICE_DEPS["m10"], scope="lang",
     ),
+    "m12": StepSpec(
+        "m12",
+        ("{python}", "-m", "pipeline.m12_compliance", "--ep", "{ep}",
+         "--lang", "{lang}", "--jobs-dir", "{jobs_dir}"),
+        deps=("m10",), artifact="12_out/compliance_report.json", scope="lang",
+    ),
     "m15": StepSpec(
         "m15",
         ("{python}", "-m", "pipeline.m15_metrics", "--ep", "{ep}",
          "--lang", "{lang}", "--jobs-dir", "{jobs_dir}"),
-        deps=("m10",), artifact="12_out/metrics.json", scope="lang",
+        deps=("m12",), artifact="12_out/metrics.json", scope="lang",
     ),
 }
 
