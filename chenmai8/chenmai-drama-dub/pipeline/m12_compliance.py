@@ -44,7 +44,15 @@ def apply_explicit_label(
     import tempfile
 
     tmp = Path(tempfile.mkdtemp(prefix="m12_lbl_"))
-    font = ImageFont.truetype(r"C:\Windows\Fonts\msyh.ttc", 84)
+    font_candidates = [
+        Path(r"C:\Windows\Fonts\msyh.ttc"),                     # windev
+        Path("/usr/share/fonts/google-noto-vf/NotoSans-VF.ttf"),  # anolis 系统字体
+        Path("/home/anuser/.local/share/fonts/NotoSansCJK-Thin.ttc"),
+    ]
+    font_path = next((p for p in font_candidates if p.is_file()), None)
+    if font_path is None:
+        raise FileNotFoundError(f"无可用的 CJK 字体: {[str(p) for p in font_candidates]}")
+    font = ImageFont.truetype(str(font_path), 84)
     probe = ImageDraw.Draw(Image.new("RGB", (8, 8)))
     bb = probe.textbbox((0, 0), "本内容由AI生成", font=font, stroke_width=6)
     img = Image.new("RGBA", (bb[2] - bb[0], bb[3] - bb[1]), (0, 0, 0, 0))
@@ -71,6 +79,8 @@ def apply_explicit_label(
 
 
 def main(argv: list[str] | None = None) -> int:
+    from pipeline.config import load_pipeline_config
+
     ap = argparse.ArgumentParser(
         prog="python -m pipeline.m12_compliance",
         description="M12 合规模块（显式水印 + C8 报告生成）",

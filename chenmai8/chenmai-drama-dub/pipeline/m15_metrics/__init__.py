@@ -96,7 +96,9 @@ def compute_metrics(
     wall_total = float(ledger.wall_total)
     cost_per_minute = round(wall_total / 60.0, 3) if wall_total > 0 else 0.0
 
-    duration_alignment_rate = float(align.get("alignment_rate") or 0.0)
+    align_summary = align.get("summary") or {}
+    duration_alignment_rate = float(
+        align_summary.get("alignment_rate") or align.get("alignment_rate") or 0.0)
 
     metrics = {
         "speaker_similarity": {
