@@ -57,6 +57,7 @@ nohup bash gpu/setup_gpu.sh > /data/xdng/setup_gpu.log 2>&1 &
 #    真名对照登记 docs/gpu_asr_align_deps.md）
 nohup bash gpu/setup_asr_venv.sh > /data/xdng/logs/setup_asr_venv.log 2>&1 &
 # ③ 权重落位：主路 ModelScope 国内直连（实测 11.8MB/s），HF 镜像兜底；目录 /data/xdng/models/<中性名>/
+#    （全组件真名对照 + sha256-16 + 获取命令示例：docs/assets/weights-provenance.md）
 # ④ 服务启动（各服务 nohup 常驻，PID+日志落盘，幂等 start/stop/restart/status）
 bash gpu-services/asr_align/run_gpu.sh start     # :9001，venv-asr
 bash gpu-services/tts/run_gpu.sh start           # :9002，主 venv；dub-tts fp32 常驻 cuda:0
@@ -159,6 +160,8 @@ python scripts/gate_b3.py [--skip-gpu]    # M8/M9/M11 + gate_b2 整门回归（�
 7. **Windows 编码**：eval/门禁对子进程统一 `PYTHONUTF8=1`；入口 `reconfigure(encoding="utf-8")`（GBK 控制台乱码）。
 8. **权重/模型路径**：权重缓存 `models/` 与素材 `clips/`、工作区 `jobs/` 均不入公开仓（.gitignore）；
    GPU 机模型 ID 经 `/data/xdng/etc/model_ids.env` 注入（真名不进公开仓代码，运行时拼接构造动态加载）。
+   权重真名对照/sha256/获取命令单一入口：[weights-provenance.md](weights-provenance.md)
+   （2026-10-06 自 windev 抢救 gate-ledger-20261004 回填）。
 9. **中性名纪律**：公开文本零上游名（gate_b0 ④：附录A 强校验 + git 追踪文件 grep 零命中；
    docs/ 与 requirements.txt 为依赖安装记录豁免，真名只登记于 docs/*_deps.md）。
    token 表在 gate_b0.py 拼接构造（防自命中）。`c2pa` 裸词允许（标准名/契约字段），
@@ -190,3 +193,4 @@ python scripts/gate_b3.py [--skip-gpu]    # M8/M9/M11 + gate_b2 整门回归（�
 | （本 commit） | docs/assets/ 四件套（manifest / specs×13 / REGENERATE / CONTRACTS） |
 | 回炉二稿（2026-09-30） | 首轮重生成试点缺口回填：m1-ingest spec 二稿（收件固定名 input.mp4 / 产物名随 targets 联动模板 / probe.json 全 schema+loudness 8 字段 / config 键位与 jobs_dir 解析语义 / CLI stdout 逐字形态 / exit 2=argparse SystemExit / `audio=skip` 位置修正：stdout 而非 probe.json）+ contract-io §3 LAYERS/EXPECTED_FILES 全表自含化 |
 | 二轮裁定钉死（2026-09-30，接 134357d） | _regen2/drama2 二轮盲重生成 7 条被迫裁定逐条收口（m1-ingest spec）：loudness_lufs falsy（0 等 falsy 一律取 -16.0，or 语义）与源探针收件副本缺失回退原路径两处行为级已随 134357d 入文；本次补钉 IngestError 消息全文五种冻结（§3）、M1 重生成自含副本形态（§2.1）、`pipeline/__init__.py` 面归属（contracts 再导出面非 M1 面、bootstrap 在 m2_ocr.py:27，§5）、重生成 gate 形态（冻结测试 sha256 夹具 + PATH 前置预检 + skipped 即 FAIL，§5）、二轮盲重生成输入面披露（§5） |
+| 权重台账回填（2026-10-06） | docs/assets/weights-provenance.md 新增（本仓外权重的真名对照+sha256-16+获取命令示例，此前仅在仓外内部台账）；来源=windev 抢救 archive/gate-ledger-20261004，与仓内 docs/*_deps.md 交叉核对（六件逐字节一致，lip 件仅宿主 IP 脱敏差异）；§2.2③ 与 §6-8 挂链 |
