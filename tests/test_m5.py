@@ -107,6 +107,9 @@ COLOR_B = (112, 76, 112)    # 紫底（BGR）
 # ---------------------------------------------------------------------------
 
 def _sapi_voices() -> dict[str, str]:
+    if shutil.which("powershell") is None:
+        pytest.skip("本机无 powershell（Windows SAPI 造声硬依赖；非 Windows 环境跳过，"
+                    "与『无 zh SAPI 声库』同口径）")
     script = (
         "Add-Type -AssemblyName System.Speech;"
         "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
