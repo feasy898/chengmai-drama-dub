@@ -372,3 +372,35 @@ def test_local_backend_payload_contract(tmp_path: Path) -> None:
     assert seen["n_candidates"] == 4
     assert [d.text for d in drafts] == ["what is it that you want", "what do you want"]
     assert drafts[0].src == "mt-core" and drafts[0].q == pytest.approx(0.88)
+
+
+# ---------------------------------------------------------------------------
+# ApiMtBackend 单对象 JSON 兜底（D2 句6 根因回归：JSON 串不得作为译文）
+# ---------------------------------------------------------------------------
+
+class _FixedChatApiBackend:
+    """_chat 恒返回固定串的桩（绕开构造期 env 检查）。"""
+
+    def __init__(self, raw: str):
+        import pipeline.mt_backends as MB
+        self.backend = MB.ApiMtBackend.__new__(MB.ApiMtBackend)
+        self.backend._chat = lambda *_a, **_k: raw  # type: ignore[assignment]
+
+
+def test_api_backend_single_object_json_unwrap():
+    """模型返回 {"text":..,"q":..} 时取 text，不得把 JSON 原串当译文。"""
+    from pipeline.mt_backends import MTContext
+    b = _FixedChatApiBackend('{"text": "What does this cost? Any discount?", "q": 0.95}')
+    drafts = b.backend.translate("这个多少钱能便宜点吗", MTContext(tgt_lang="en"))
+    assert len(drafts) == 1
+    assert drafts[0].text == "What does this cost? Any discount?"
+    assert abs(drafts[0].q - 0.95) < 1e-9
+    assert "{" not in drafts[0].text and "q" not in drafts[0].text.split()[-1:]
+
+
+def test_api_backend_plain_fallback_kept():
+    """非 JSON 回复仍走整体单候选兜底（既有行为不变）。"""
+    from pipeline.mt_backends import MTContext
+    b = _FixedChatApiBackend("Plain translation, no json at all.")
+    drafts = b.backend.translate("原文", MTContext(tgt_lang="en"))
+    assert drafts and drafts[0].text == "Plain translation, no json at all."

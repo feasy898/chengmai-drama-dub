@@ -325,7 +325,26 @@ class ApiMtBackend:
             stripped = raw.strip()
             if not stripped:
                 raise MtBackendError("mt-api 返回空内容")
-            drafts = [MTDraft(text=stripped, q=0.8, src=self.name)]
+            # 单对象兜底：模型返回 {"text": ..., "q": ...}（非数组）时取其 text——
+            # 否则整个 JSON 串会被当译文喂给 TTS 照读（D2 句6 长度异常根因，2026-10-06）
+            obj = None
+            try:
+                obj = json.loads(stripped)
+            except ValueError:
+                m2 = re.search(r"\{.*\}", stripped, re.DOTALL)
+                if m2:
+                    try:
+                        obj = json.loads(m2.group(0))
+                    except ValueError:
+                        obj = None
+            if isinstance(obj, dict) and str(obj.get("text") or "").strip():
+                q2 = obj.get("q")
+                drafts = [MTDraft(
+                    text=str(obj["text"]).strip(),
+                    q=0.8 if q2 is None else max(0.0, min(1.0, float(q2))),
+                    src=self.name)]
+            else:
+                drafts = [MTDraft(text=stripped, q=0.8, src=self.name)]
         return drafts[:n_candidates]
 
 
