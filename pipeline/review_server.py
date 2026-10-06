@@ -700,12 +700,14 @@ def _ffprobe_tags(path: Path) -> dict[str, str]:
 def build_compliance(
     root: Path, ep: str, lang: str, cfg: dict[str, Any],
     reviewed: list[str],
+    explicit_state: str = "pending",
 ) -> dict[str, Any]:
     """C8 合规报告（审校台出口）。
 
     如实口径：findings 归 M12 规则引擎（未接入前留空并在 generator 注明）；
     隐式标识状态对 12_out 成片 ffprobe 实测（C7 缺省回落 m9 配置兜底）；
-    显式/C2PA/水印三项 pending（M12 未部署），不伪造 ok。
+    explicit 状态由调用方传入（M12 施加显式标识成功后传 "ok"，缺省 pending，
+    如实不虚报）；C2PA/水印两项 pending（M12 未部署），不伪造 ok。
     """
     channels = cfg.get("channels") or {}
     market = str((channels.get(lang) or {}).get("market", f"unknown-{lang}"))
@@ -731,13 +733,13 @@ def build_compliance(
         "ep": ep,
         "findings": [],
         "label_status": {
-            "explicit": "pending", "implicit": implicit_state,
+            "explicit": explicit_state, "implicit": implicit_state,
             "c2pa": "pending", "audio_wm": "pending",
         },
         "human_review": reviewed,
         "generator": (
             "review-console（M13 审校台导出；findings 由 M12 规则引擎产出，"
-            "未接入前留空；explicit/c2pa/audio_wm 待 M12 落地）"
+            "未接入前留空；explicit 由 M12 回填，c2pa/audio_wm 待 M12 落地）"
         ),
     }
     C.ComplianceReport.model_validate(report)  # C8 契约强校验后才落盘

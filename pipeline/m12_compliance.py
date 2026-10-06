@@ -48,6 +48,9 @@ def apply_explicit_label(
         Path(r"C:\Windows\Fonts\msyh.ttc"),                     # windev
         Path("/usr/share/fonts/google-noto-vf/NotoSans-VF.ttf"),  # anolis 系统字体
         Path("/home/anuser/.local/share/fonts/NotoSansCJK-Thin.ttc"),
+        # Debian/Ubuntu noto-cjk 包（Linux 全链实测补充，2026-10-06）
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"),
     ]
     font_path = next((p for p in font_candidates if p.is_file()), None)
     if font_path is None:
@@ -93,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     cfg = load_pipeline_config(args.configs_dir)
-    jobs_root = Path(cfg["paths"]["jobs_dir"])
+    # --jobs-dir 显式优先（与其余模块一致；缺省回落 configs/pipeline.yaml）
+    jobs_root = Path(args.jobs_dir) if args.jobs_dir else Path(cfg["paths"]["jobs_dir"])
     root = jobs_root / args.ep
 
     apply_explicit_label(root, args.ep, args.lang)
