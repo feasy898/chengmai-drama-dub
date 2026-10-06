@@ -289,3 +289,43 @@ def test_explicit_unknown_engine(service: TtsClient, refs: dict[str, Path]) -> N
     with pytest.raises(TtsError, match="HTTP 400"):
         _client.synth(EN_SENTENCE, refs["voice"], lang="en", engine="no-such-engine",
                       out="unused.wav")
+
+
+# ---------------------------------------------------------------------------
+# D2 实测校正决策（post-synth closed-loop）——纯函数单元（无服务依赖）
+# ---------------------------------------------------------------------------
+
+def test_post_correction_in_window():
+    """窗内 → none（不动，零成本路径）。"""
+    from pipeline.m7_tts import _post_correction
+    assert _post_correction(2.5, 2.129, 2.602, (0.9, 1.1)) == ("none", 1.0)
+    assert _post_correction(2.129, 2.129, 2.602, (0.9, 1.1)) == ("none", 1.0)
+    assert _post_correction(2.602, 2.129, 2.602, (0.9, 1.1)) == ("none", 1.0)
+
+
+def test_post_correction_atempo_band():
+    """窗外但所需变速在 atempo 微调窗内 → atempo（零额外 TTS）。"""
+    from pipeline.m7_tts import _post_correction
+    act, val = _post_correction(3.042, 2.291, 2.8, (0.9, 1.1))
+    assert act == "atempo" and abs(val - 3.042 / 2.8) < 1e-9   # 超hi→加速
+    act, val = _post_correction(2.508, 2.606, 3.185, (0.9, 1.1))
+    assert act == "atempo" and abs(val - 2.508 / 2.606) < 1e-9  # 低于lo→放慢
+
+
+def test_post_correction_resynth_when_atempo_insufficient():
+    """偏差超出 atempo 窗 → resynth，df 修正系数 = target/actual。"""
+    from pipeline.m7_tts import _post_correction
+    act, val = _post_correction(4.5, 2.291, 2.8, (0.9, 1.1))
+    assert act == "resynth" and abs(val - 2.8 / 4.5) < 1e-9
+    act, val = _post_correction(1.0, 2.606, 3.185, (0.9, 1.1))
+    assert act == "resynth" and abs(val - 2.606 / 1.0) < 1e-9
+
+
+def test_post_correction_window_semantics_frozen():
+    """窗口语义冻结探针：±10% 口径只由 M8/C5 决定，校正函数不改窗。"""
+    from pipeline.m7_tts import _post_correction
+    lo, hi = 2.0, 2.4444  # ±10% 例
+    for actual in (1.5, 1.99, 2.0, 2.2, 2.4444, 2.45, 3.5):
+        act, _ = _post_correction(actual, lo, hi, (0.9, 1.1))
+        in_win = lo <= actual <= hi
+        assert (act == "none") == in_win

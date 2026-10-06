@@ -24,10 +24,46 @@ CLI::
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
+import wave
 from pathlib import Path
 from typing import Optional
+
+
+def _wav_duration(path: Path) -> Optional[float]:
+    """PCM wav 时长（秒）；非 wave 可读格式返回 None（校正跳过，不猜）。"""
+    try:
+        with wave.open(str(path), "rb") as w:
+            return w.getnframes() / float(w.getframerate())
+    except (wave.Error, OSError):
+        return None
+
+
+def _post_correction(actual: float, lo: float, hi: float,
+                     atempo_window: tuple[float, float]) -> tuple[str, float]:
+    """D2 实测校正决策（M8 est 预测与 TTS 实测存在系统偏差的执行层闭环）。
+
+    - actual 已落窗 → ("none", 1.0)
+    - 窗外但所需变速在 atempo 微调窗（默认 [0.9,1.1]，T14 口径）内
+      → ("atempo", need)（变速不变调，听感微调，零额外 TTS 调用）
+    - 窗外且 atempo 不够 → ("resynth", target/actual)（df 修正系数：新 df=原df×系数，
+      交 TTS 服务 duration_factor 通道重合成一次，0.5–2.0 服务范围内）
+    窗口定义（原句 ±10%）由 M8/C5 冻结，本函数不改窗、不放宽。
+    """
+    if lo <= actual <= hi:
+        return ("none", 1.0)
+    target = hi if actual > hi else lo
+    need = actual / target  # >1=加速缩短, <1=放慢加长
+    a_lo, a_hi = atempo_window
+    if a_lo <= need <= a_hi:
+        return ("atempo", need)
+    return ("resynth", target / actual)
+
+
+#: TTS 服务 duration_factor 通道范围（tts_client C5 契约，0.5–2.0）
+_DF_RANGE = (0.5, 2.0)
 
 
 def synth_episode(ep: str, lang: str, *, jobs_dir: str | Path,
@@ -51,6 +87,28 @@ def synth_episode(ep: str, lang: str, *, jobs_dir: str | Path,
             f"C5 不存在: {ws/'07_synth'/f'synth_plan.{lang}.jsonl'}（先跑 M8）")
     rows = C.load_jsonl(plan_path, C.SynthPlanTable).root
 
+    # D2 校正所需的句窗（M8 落的 align_report；缺失则不校正，行为回退旧口径）
+    cfg_all = load_pipeline_config()
+    atempo_window = tuple(cfg_all.get("m8", {}).get("atempo_window", (0.9, 1.1)))
+    windows: dict[str, tuple[float, float]] = {}
+    report_path = ws / "07_synth" / f"align_report.{lang}.json"
+    if report_path.is_file():
+        rep = json.loads(report_path.read_text(encoding="utf-8"))
+        for it in rep.get("items", []):
+            win = it.get("window")
+            if it.get("utt_id") and isinstance(win, list) and len(win) == 2:
+                windows[it["utt_id"]] = (float(win[0]), float(win[1]))
+    else:
+        print(f"note: align_report 缺失（{report_path.name}），跳过 D2 实测校正")
+
+    def _apply_atempo(out: Path, factor: float) -> None:
+        tmp = out.with_name(out.stem + ".fix.wav")
+        subprocess.run(
+            [FFMPEG, "-y", "-loglevel", "error", "-i", str(out),
+             "-af", f"atempo={factor:.4f}", str(tmp)],
+            check=True, timeout=300)
+        tmp.replace(out)
+
     cli = TtsClient(url) if url else TtsClient()
     n = 0
     skipped = 0
@@ -61,24 +119,54 @@ def synth_episode(ep: str, lang: str, *, jobs_dir: str | Path,
             print(f"skip {r.utt_id} (keep_original)")
             continue
         out = ws / r.out
+        df = float(r.duration_factor)
         res = cli.synth(
             r.text, str(ws / r.voice_ref),
             emo_ref=str(ws / r.emo_ref) if r.emo_ref else None,
             lang=lang, emo_alpha=float(r.emo_alpha),
-            duration_factor=float(r.duration_factor),
+            duration_factor=df,
             engine=r.engine or "auto", out=str(out), utt_id=r.utt_id)
         if r.atempo and abs(float(r.atempo) - 1.0) > 1e-3:
-            tmp = out.with_name(out.stem + ".atempo.wav")
-            subprocess.run(
-                [FFMPEG, "-y", "-loglevel", "error", "-i", str(out),
-                 "-af", f"atempo={float(r.atempo):.4f}", str(tmp)],
-                check=True, timeout=300)
-            tmp.replace(out)
+            _apply_atempo(out, float(r.atempo))
+        # ---- D2 实测校正（两级：atempo 微调 / df 修正重合成一次）----
+        win = windows.get(r.utt_id)
+        postfix = "in-window"
+        if win is not None:
+            lo, hi = win
+            actual = _wav_duration(out)
+            if actual is None:
+                postfix = "dur-unknown(不校正)"
+            else:
+                act, val = _post_correction(actual, lo, hi, atempo_window)
+                if act == "atempo":
+                    _apply_atempo(out, val)
+                    fixed = _wav_duration(out) or actual / val
+                    postfix = f"postfix-atempo={val:.3f} {actual:.2f}->{fixed:.2f}s"
+                elif act == "resynth":
+                    df2 = min(max(df * val, _DF_RANGE[0]), _DF_RANGE[1])
+                    res = cli.synth(
+                        r.text, str(ws / r.voice_ref),
+                        emo_ref=str(ws / r.emo_ref) if r.emo_ref else None,
+                        lang=lang, emo_alpha=float(r.emo_alpha),
+                        duration_factor=df2,
+                        engine=r.engine or "auto", out=str(out), utt_id=r.utt_id)
+                    actual2 = _wav_duration(out)
+                    if actual2 is not None and not (lo <= actual2 <= hi):
+                        need2 = actual2 / (hi if actual2 > hi else lo)
+                        a_lo2, a_hi2 = atempo_window
+                        if a_lo2 <= need2 <= a_hi2:
+                            _apply_atempo(out, need2)
+                            actual2 = _wav_duration(out) or actual2 / need2
+                    postfix = (f"postfix-resynth df {df:.3f}->{df2:.3f} "
+                               f"{actual:.2f}->{actual2 if actual2 is not None else -1:.2f}s")
+                    df = df2
+                else:
+                    postfix = "in-window"
         n += 1
         wavs.append(str(out))
         print(f"synth {r.utt_id} engine={res['engine']} "
-              f"dur={res['duration_s']}s df={r.duration_factor} "
-              f"atempo={r.atempo} expect={r.expect_dur}s")
+              f"dur={res['duration_s']}s df={df} "
+              f"atempo={r.atempo} expect={r.expect_dur}s [{postfix}]")
     if n <= 0:
         raise RuntimeError("C5 无可合成句（全 keep_original？）——不出假交付")
     return {"n": n, "skipped": skipped, "wavs": wavs}
