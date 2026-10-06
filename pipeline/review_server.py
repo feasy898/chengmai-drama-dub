@@ -701,13 +701,15 @@ def build_compliance(
     root: Path, ep: str, lang: str, cfg: dict[str, Any],
     reviewed: list[str],
     explicit_state: str = "pending",
+    audio_wm_state: str = "pending",
 ) -> dict[str, Any]:
     """C8 合规报告（审校台出口）。
 
     如实口径：findings 归 M12 规则引擎（未接入前留空并在 generator 注明）；
     隐式标识状态对 12_out 成片 ffprobe 实测（C7 缺省回落 m9 配置兜底）；
-    explicit 状态由调用方传入（M12 施加显式标识成功后传 "ok"，缺省 pending，
-    如实不虚报）；C2PA/水印两项 pending（M12 未部署），不伪造 ok。
+    explicit / audio_wm 状态由调用方传入（M12 施加显式标识成功后传 "ok"；
+    audio_wm 由 M12 对最终成片回读检测精确匹配后传 "ok"，缺省均 pending，
+    如实不虚报）；C2PA pending（M12 未部署），不伪造 ok。
     """
     channels = cfg.get("channels") or {}
     market = str((channels.get(lang) or {}).get("market", f"unknown-{lang}"))
@@ -728,18 +730,22 @@ def build_compliance(
     if mp4.is_file():
         tags = _ffprobe_tags(mp4)
         implicit_state = "ok" if tags.get(label_field) == label_value else "failed"
+    if audio_wm_state == "pending":
+        wm_note = "c2pa/audio_wm 待 M12 落地"
+    else:
+        wm_note = f"c2pa 待落地，audio_wm={audio_wm_state}（M12 对成片回读检测实测）"
     report = {
         "market": market,
         "ep": ep,
         "findings": [],
         "label_status": {
             "explicit": explicit_state, "implicit": implicit_state,
-            "c2pa": "pending", "audio_wm": "pending",
+            "c2pa": "pending", "audio_wm": audio_wm_state,
         },
         "human_review": reviewed,
         "generator": (
             "review-console（M13 审校台导出；findings 由 M12 规则引擎产出，"
-            "未接入前留空；explicit 由 M12 回填，c2pa/audio_wm 待 M12 落地）"
+            f"未接入前留空；explicit 由 M12 回填，{wm_note}）"
         ),
     }
     C.ComplianceReport.model_validate(report)  # C8 契约强校验后才落盘
